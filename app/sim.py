@@ -39,8 +39,10 @@ class World:
     COLLECT_MIN = 2
     UNLOAD_MIN = 3
 
-    def __init__(self, num_robots=None, seed=42, live=False):
+    def __init__(self, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
         self.live = live
+        self.use_optimizer = use_optimizer
+        self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (1.0 if live else 0.2)
         self.rng = random.Random(seed)
         self.t = 0                    # sim minutes since DAY_START
         self.running = False
@@ -103,6 +105,9 @@ class World:
     # ---- small queries --------------------------------------------------------------------
     def sim_time(self, minutes=None):
         return (DAY_START + timedelta(minutes=self.t if minutes is None else minutes)).isoformat()
+
+    def has_open_task(self, bin_id):
+        return any(t["bin_id"] == bin_id and t["status"] in ("open", "assigned", "escalated") for t in self.tasks)
 
     def node_name(self, node_id):
         return self.nodes[node_id]["name"]
@@ -422,9 +427,9 @@ class World:
             c.commit()
 
 
-def run_headless(num_robots, seed=42, minutes=DAY_END_MIN):
+def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True):
     """One full sim day with no database or dashboard. This is the `run_fn` for optimize.fleet_size_sweep."""
-    w = World(num_robots=num_robots, seed=seed, live=False)
+    w = World(num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
     for _ in range(minutes):
         w.tick()
     waits = w.final_waits() or [0]

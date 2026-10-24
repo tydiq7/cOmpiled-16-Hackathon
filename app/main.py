@@ -1,23 +1,44 @@
 """FastAPI app: REST endpoints plus the background sim loop."""
 import asyncio
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import db
-from .sim import World
+from . import db, optimize
+from .sim import World, run_headless
 
-STATE = {"world": None}
+STATE = {"world": None, "sweep": None, "sweeping": False}
 
 
 def new_world():
     db.reset_db()
     w = World(live=True)
     w.persist()
+    if STATE["sweep"]:  # reset_db wipes meta; keep the finished sweep
+        db.set_meta("fleet_sizing", STATE["sweep"]["results"])
     STATE["world"] = w
     return w
+
+
+async def run_sweep():
+    """Headless fleet-sizing sweep in a worker thread so the live sim keeps ticking."""
+    if STATE["sweeping"]:
+        return
+    STATE["sweeping"] = True
+    try:
+        result = await asyncio.to_thread(optimize.fleet_size_sweep, run_headless)
+        STATE["sweep"] = result
+        with db.lock:
+            db.set_meta("fleet_sizing", result["results"])
+        w = world()
+        with db.lock:
+            w.log("fleet_sizing", "Fleet sizing done: recommended fleet is "
+                  + (f"{result['recommended']} robots" if result["recommended"] else "larger than 8 robots"))
+    finally:
+        STATE["sweeping"] = False
 
 
 async def sim_loop():
@@ -35,6 +56,8 @@ async def sim_loop():
 async def lifespan(app):
     new_world()
     task = asyncio.create_task(sim_loop())
+    if os.environ.get("SWEEP_ON_START", "1") == "1":
+        asyncio.create_task(run_sweep())
     yield
     task.cancel()
 
@@ -150,7 +173,16 @@ def bin_report(bin_id: str, body: BinReport):
 
 @app.get("/analytics")
 def analytics():
-    return {"kpis": world().kpis(), "fleet_sizing": db.get_meta("fleet_sizing", [])}
+    sweep = STATE["sweep"] or {}
+    return {"kpis": world().kpis(), "fleet_sizing": sweep.get("results", []),
+            "recommended_fleet": sweep.get("recommended"), "sweep_running": STATE["sweeping"]}
+
+
+@app.post("/analytics/run_sweep")
+async def analytics_run_sweep():
+    """Re-run the fleet-sizing sweep (takes a few seconds)."""
+    asyncio.create_task(run_sweep())
+    return {"started": True}
 
 
 @app.post("/supervisor/resume")
