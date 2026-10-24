@@ -151,3 +151,14 @@ def bin_report(bin_id: str, body: BinReport):
 @app.get("/analytics")
 def analytics():
     return {"kpis": world().kpis(), "fleet_sizing": db.get_meta("fleet_sizing", [])}
+
+
+@app.post("/supervisor/resume")
+def supervisor_resume():
+    """A human clears the over-budget pause so dispatching continues."""
+    w = world()
+    w.dispatch_paused = False
+    w.energy_pct = 0.0
+    for t in w.tasks:
+        t["attempts"] = min(t["attempts"], 1)
+    return {"dispatch_paused": False}

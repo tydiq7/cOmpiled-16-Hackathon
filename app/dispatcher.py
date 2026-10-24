@@ -7,7 +7,8 @@ BATTERY_MARGIN_PCT = 5.0
 
 def step(w):
     create_tasks(w)
-    assign_greedy(w)
+    if not w.dispatch_paused:
+        assign_greedy(w)
 
 
 def create_tasks(w):

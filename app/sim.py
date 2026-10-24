@@ -8,7 +8,7 @@ import json
 import random
 from datetime import datetime, timedelta
 
-from . import db, dispatcher, navigation as nav, seed_ucsd
+from . import db, dispatcher, navigation as nav, seed_ucsd, supervisor
 
 DAY_START = datetime(2026, 10, 24, 8, 0)
 DAY_END_MIN = 12 * 60  # 8 AM -> 8 PM
@@ -80,6 +80,8 @@ class World:
         self.waits = []               # minutes from 80% full to emptied, per completed pickup
         self.dist_driven_m = 0.0
         self.pickups = 0
+        self.energy_pct = 0.0         # total battery % consumed by the fleet
+        self.dispatch_paused = False  # set by the over-budget detector
 
     # ---- construction helpers -------------------------------------------------------------
     def _new_robot(self, r):
@@ -87,7 +89,8 @@ class World:
         return {"id": r["id"], "node": r["node_id"], "state": "IDLE", "battery": 100.0, "load": 0.0,
                 "lat": n["lat"], "lng": n["lng"], "route": [], "path": [], "seg": None,
                 "task_id": None, "timer": 0, "frozen": False, "waiting": False,
-                "drain_mult": 1.0, "drain_until": None, "last_progress": 0, "target": None}
+                "drain_mult": 1.0, "drain_until": None, "last_progress": 0, "target": None,
+                "visits": [], "prev_state": None, "stuck_since": None}
 
     def new_task(self, b):
         self._task_id += 1
@@ -153,8 +156,33 @@ class World:
         p = nav.shortest_path(self.graph, r["node"], dst_node)
         if p is None:
             return False
-        r["path"], r["target"], r["waiting"] = p[0][1:], dst_node, False
+        r["path"], r["target"], r["waiting"], r["visits"] = p[0][1:], dst_node, False, []
         return True
+
+    def begin_path_from(self, r, dst_node):
+        """Like _begin_path, but valid mid-edge: the robot may U-turn if going back is shorter."""
+        if r["seg"]:
+            u, v, pos, length = r["seg"]
+            ahead, back = nav.shortest_path(self.graph, v, dst_node), nav.shortest_path(self.graph, u, dst_node)
+            cost_ahead = (length - pos) + ahead[1] if ahead else None
+            cost_back = pos + back[1] if back else None
+            if cost_back is not None and (cost_ahead is None or cost_back < cost_ahead):
+                r["seg"] = (v, u, length - pos, length)
+                r["path"] = back[0]  # starts at u, the new segment end
+            elif ahead:
+                r["path"] = ahead[0]  # starts at v, the current segment end
+            else:
+                return False
+        else:
+            p = nav.shortest_path(self.graph, r["node"], dst_node)
+            if p is None:
+                return False
+            r["path"] = p[0][1:]
+        r["target"], r["waiting"], r["visits"] = dst_node, False, []
+        return True
+
+    def current_fill_multiplier(self):
+        return fill_multiplier((DAY_START + timedelta(minutes=self.t)).hour)
 
     def _replan(self, r, blocked_name=None):
         """Recompute the path from where the robot will next be at a node."""
@@ -171,6 +199,14 @@ class World:
             self.log("reroute", f"Robot {r['id']} rerouted: {blocked_name} blocked", robot_id=r["id"])
         r["waiting"] = False
         return True
+
+    def remaining_path_m(self, r):
+        """Metres left on the robot's current path (including the rest of the current edge)."""
+        total = 0.0
+        if r["seg"]:
+            total += r["seg"][3] - r["seg"][2]
+        nodes = r["path"] if r["seg"] else [r["node"]] + r["path"]
+        return total + nav.path_length(self.graph, nodes)
 
     def _first_blocked_edge(self, r):
         nodes = ([r["seg"][1]] if r["seg"] else [r["node"]]) + (r["path"][1:] if r["seg"] else r["path"])
@@ -194,9 +230,12 @@ class World:
                 step = min(budget, length - pos)
                 pos, budget, moved = pos + step, budget - step, True
                 self.dist_driven_m += step
-                r["battery"] -= step * self.DRAIN_PER_M * r["drain_mult"]
+                used = step * self.DRAIN_PER_M * r["drain_mult"]
+                self.energy_pct += used
+                r["battery"] -= used
                 if pos >= length - 1e-9:
                     r["node"], r["seg"] = v, None
+                    r["visits"].append(v)
                     r["path"].pop(0)
                     n = self.nodes[v]
                     r["lat"], r["lng"] = n["lat"], n["lng"]
@@ -218,7 +257,9 @@ class World:
     def _step_robot(self, r):
         if r["drain_until"] is not None and self.t >= r["drain_until"]:
             r["drain_mult"], r["drain_until"] = 1.0, None
-        r["battery"] = max(0.0, r["battery"] - self.IDLE_DRAIN_PER_MIN * r["drain_mult"])
+        idle = self.IDLE_DRAIN_PER_MIN * r["drain_mult"]
+        self.energy_pct += min(idle, r["battery"])
+        r["battery"] = max(0.0, r["battery"] - idle)
         if r["frozen"]:
             return
         st = r["state"]
@@ -229,7 +270,7 @@ class World:
                     r["state"], r["last_progress"] = "EN_ROUTE", self.t
                     self._advance_and_arrive(r)
                 else:
-                    self._release_task(r, "no route to bin")
+                    self.release_task(r, "no route to bin")
             else:
                 r["last_progress"] = self.t  # idle robots are not "stuck"
         elif st == "EN_ROUTE" or st == "RETURNING":
@@ -284,14 +325,15 @@ class World:
         else:
             r["state"] = "IDLE"
 
-    def _release_task(self, r, why):
+    def release_task(self, r, why, quiet=False):
         for bid in r["route"]:
             for t in self.tasks:
                 if t["bin_id"] == bid and t["status"] == "assigned":
                     t["status"], t["robot_id"] = "open", None
                     self._refresh_bin_status(self.bin_by_id[bid])
         r["route"], r["task_id"] = [], None
-        self.log("task_released", f"Robot {r['id']} released its task ({why})", robot_id=r["id"])
+        if not quiet:
+            self.log("task_released", f"Robot {r['id']} released its task ({why})", robot_id=r["id"])
 
     # ---- tick -----------------------------------------------------------------------------
     def tick(self):
@@ -309,6 +351,7 @@ class World:
         dispatcher.step(self)
         for r in self.robots:
             self._step_robot(r)
+        supervisor.step(self)
         if self.live:
             self.persist()
 
@@ -328,8 +371,10 @@ class World:
         r["frozen"] = True
         self.log("fault", f"FAULT: Robot {robot_id} frozen", robot_id=robot_id)
 
-    def drain_battery(self, robot_id, minutes=15, mult=12.0):
+    def drain_battery(self, robot_id, minutes=10, mult=4.0):
+        """Fault: the battery drops to 35% and drains 4x faster for a while."""
         r = self.robot_by_id[robot_id]
+        r["battery"] = min(r["battery"], 35.0)
         r["drain_mult"], r["drain_until"] = mult, self.t + minutes
         self.log("fault", f"FAULT: Robot {robot_id} battery draining fast", robot_id=robot_id)
 
