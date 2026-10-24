@@ -3,290 +3,281 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Waste Fleet Dashboard</title>
+<title>Campus Waste Fleet</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#1c2b30;--mute:#64767c;--paper:#f5f6f2;--card:#fff;--line:#d9ded8;--teal:#0e7466;--ok:#3f9d5a;--warn:#e0a21b;--bad:#d1432f}
+:root{--bg:#eef1f4;--card:#fff;--ink:#17232b;--mute:#5d6f78;--line:#e1e6ea;--brand:#0f6b5e;--ok:#2fa05a;--warn:#f0a81c;--bad:#e04b36;--blue:#2d6fd6}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);display:grid;grid-template-columns:1fr 360px}
-#map{height:100vh}
-aside{height:100vh;overflow-y:auto;padding:14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
-h1{font-size:17px;margin:0}
-h2{font-size:13px;margin:0 0 6px;color:var(--mute);font-weight:600}
-.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.chip{padding:2px 9px;border-radius:99px;background:var(--teal);color:#fff;font-size:12px}
-.chip.sample{background:var(--warn);color:#000}
-.chip.paused{background:var(--mute)}
-#clock{font-size:22px;font-weight:700}
+body{font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--bg);display:grid;grid-template-columns:1fr 400px;grid-template-rows:auto minmax(0,1fr)}
+header{grid-column:1/-1;position:relative;display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:10px 18px;background:var(--card);border-bottom:1px solid var(--line)}
+.brand h1{font-size:17px;margin:0;line-height:1.2}.brand small{color:var(--mute)}
+#clock{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;min-width:100px}
+.sp{flex:1}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:600;background:#e0f2ee;color:var(--brand)}
+.chip i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.chip.sample{background:#fdf0d2;color:#8a5a00}.chip.paused{background:#e9edf0;color:var(--mute)}
+.btn{font:inherit;font-weight:600;padding:7px 14px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);cursor:pointer}
+.btn:hover{border-color:var(--brand)}.btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.btn.danger{color:var(--bad);border-color:#f1c4bc}.btn.danger:hover{background:#fdeeeb;border-color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-right:1px solid var(--line);background:#fff;font:inherit;padding:7px 11px;cursor:pointer;color:var(--mute)}
+.seg button:last-child{border-right:0}.seg button.on{background:var(--ink);color:#fff}
+button:focus-visible,select:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+#day{position:absolute;left:0;bottom:0;height:3px;width:0;background:var(--brand);transition:width .4s}
+#map{height:100%;background:#dfe5e8}
+aside{min-height:0;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:12px;border-left:1px solid var(--line)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.card h2{font-size:15px;margin:0 0 2px}.hint{color:var(--mute);font-size:12px;margin:0 0 10px}
 .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
-.kpi b{display:block;font-size:22px}
-.kpi span{color:var(--mute);font-size:12px}
-.row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
-.row select{flex:1;min-width:0}
-button,select{font:inherit;padding:5px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
-button{cursor:pointer}
-button:hover{border-color:var(--teal)}
-button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
-button.go{background:var(--teal);color:#fff;border-color:var(--teal)}
-button.danger{border-color:var(--bad);color:var(--bad)}
-input[type=range]{flex:1}
-#feed{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;min-height:140px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
-#feed li{padding:6px 9px;border-bottom:1px solid var(--line)}
-#feed li small{color:var(--mute);margin-right:6px}
-#feed li.alert{background:#fde8e4;font-weight:600}
-#banner{position:fixed;top:12px;left:12px;right:384px;z-index:1000;background:var(--bad);color:#fff;padding:10px 14px;border-radius:6px;font-weight:600;display:none}
-.robot{background:var(--ink);color:#fff;border-radius:6px;padding:2px 6px;font-size:11px;line-height:1.2;white-space:nowrap;width:auto!important;height:auto!important;transform-origin:center;transition:transform .5s linear}
-.robot span{display:block;font-weight:400;opacity:.8}
-.robot.STUCK,.robot.ESCALATED{background:var(--bad)}
-.robot.CHARGING{background:var(--teal)}
+.kpi{background:var(--bg);border-radius:10px;padding:9px 11px}.kpi b{display:block;font-size:24px;line-height:1.2}.kpi span{font-size:12px;color:var(--mute)}
+.stack{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line);margin:12px 0 8px}
+.stack i{display:block;transition:width .4s}
+.key{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mute)}.key b{color:var(--ink)}
+.key span:before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;background:var(--c)}
+.frow{display:grid;grid-template-columns:1fr auto;gap:6px 8px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+.frow:first-of-type{border-top:0}.frow label{grid-column:1/-1;font-weight:600}.frow label small{display:block;font-weight:400;color:var(--mute)}
+select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);min-width:0;width:100%}
+#feed{list-style:none;margin:0;padding:0;max-height:240px;overflow-y:auto}
+#feed li{padding:7px 10px;margin-bottom:6px;border-radius:8px;background:var(--bg);border-left:4px solid var(--brand)}
+#feed li small{display:block;color:var(--mute);font-size:11px}
+#feed li.alert{border-color:var(--bad);background:#fdeeeb;font-weight:600}#feed li.reroute{border-color:var(--blue)}#feed li.fault{border-color:var(--warn)}
+#feed li.empty{border-color:var(--line);color:var(--mute)}
+.rcard{display:grid;grid-template-columns:auto 1fr;gap:2px 10px;width:100%;text-align:left;font:inherit;color:inherit;background:var(--bg);border:0;border-radius:10px;padding:9px 11px;margin-bottom:6px;cursor:pointer}
+.rcard:hover{background:#e4eaee}.av{grid-row:1/3;align-self:center;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:700;display:grid;place-items:center}
+.rcard small{color:var(--mute)}.bar{grid-column:1/-1;height:5px;border-radius:9px;background:var(--line);overflow:hidden;margin-top:4px}.bar i{display:block;height:100%}
+#toast{position:fixed;left:calc(50% - 200px);top:76px;transform:translateX(-50%);z-index:2000;max-width:min(520px,80vw);padding:10px 16px;border-radius:10px;color:#fff;font-weight:600;background:var(--ink);box-shadow:0 6px 20px rgba(0,0,0,.25);display:none}
+#toast.bad{background:var(--bad)}
+.legend{background:#fff;padding:10px 12px;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.18);font-size:12px;line-height:1.9}
+.legend span{display:flex;align-items:center;gap:8px}.legend i{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px #aab6bc}
+.legend em{width:20px;height:0;border-top:3px dashed var(--bad);display:inline-block}
+.bin .bd{width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.bin .bd.over{animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(224,75,54,.7)}100%{box-shadow:0 0 0 12px rgba(224,75,54,0)}}
+.nlabel{background:rgba(255,255,255,.92);border:0;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.25);font-weight:600;font-size:11px;padding:2px 6px;color:var(--ink)}
+.nlabel:before{display:none}.nlabel em{font-style:normal;background:var(--bad);color:#fff;border-radius:99px;padding:0 6px;margin-left:5px}
+.far .nlabel{display:none}
+.rb{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;background:var(--ink);color:#fff;border-radius:99px;padding:3px 10px 3px 4px;font-size:11px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.rb b{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--c)}
 .leaflet-marker-icon.robot{transition:transform .5s linear}
-@media(max-width:800px){body{grid-template-columns:1fr;grid-template-rows:50vh auto}#map{height:50vh}aside{height:auto;border-left:0}#banner{right:12px}}
+@media(max-width:900px){body{display:block;height:auto}#map{height:55vh}aside{overflow:visible}#toast{left:50%}}
+@media(prefers-reduced-motion:reduce){.bin .bd.over{animation:none}}
 </style>
 </head>
 <body>
-<div id="banner" role="alert"></div>
+<div id="toast" role="alert"></div>
+<header>
+  <div class="brand"><h1>Campus Waste Fleet</h1><small>Robots empty the bins before they overflow</small></div>
+  <div id="clock">--:--</div>
+  <span id="chip" class="chip"><i></i><span>Loading</span></span>
+  <div class="sp"></div>
+  <button class="btn primary" id="b-start">Start</button>
+  <button class="btn" id="b-pause">Pause</button>
+  <button class="btn" id="b-reset">Reset</button>
+  <div class="seg" id="speeds" role="group" aria-label="Simulation speed"></div>
+  <div id="day"></div>
+</header>
 <div id="map"></div>
 <aside>
-  <div class="top"><h1>Autonomous Waste Fleet</h1><span id="chip" class="chip">Loading</span></div>
-  <div id="clock">--:--</div>
-
-  <section><h2>Key numbers</h2>
+  <section class="card">
+    <h2>At a glance</h2><p class="hint" id="count">Waiting for data</p>
     <div class="kpis">
       <div class="kpi"><b id="k-needed">—</b><span>Robots needed</span></div>
-      <div class="kpi"><b id="k-over">—</b><span>Overflow minutes</span></div>
-      <div class="kpi"><b id="k-wait">—</b><span>Average wait (min)</span></div>
+      <div class="kpi"><b id="k-over">—</b><span>Minutes a bin was overflowing</span></div>
+      <div class="kpi"><b id="k-wait">—</b><span>Average wait for a pickup (min)</span></div>
       <div class="kpi"><b id="k-dist">—</b><span>Distance per pickup (m)</span></div>
     </div>
+    <div class="stack" id="stack"></div><div class="key" id="key"></div>
   </section>
 
-  <section><h2>Simulation</h2>
-    <div class="row">
-      <button class="go" id="b-start">Start</button>
-      <button id="b-pause">Pause</button>
-      <button id="b-reset">Reset</button>
-    </div>
-    <div class="row"><label for="speed">Speed</label>
-      <input id="speed" type="range" min="1" max="100" value="20"><span id="speed-val">20</span>
-    </div>
+  <section class="card">
+    <h2>Try a problem</h2><p class="hint">Watch the system handle it on its own.</p>
+    <div class="frow"><label for="f-edge">A crowd blocks a walkway<small>Robots reroute around it for 30 minutes</small></label><select id="f-edge"></select><button class="btn danger" id="b-block">Block it</button></div>
+    <div class="frow"><label for="f-r1">A robot gets stuck<small>The system reassigns its job and alerts a person</small></label><select id="f-r1"></select><button class="btn danger" id="b-freeze">Freeze it</button></div>
+    <div class="frow"><label for="f-r2">A battery drains fast<small>The robot heads back to charge</small></label><select id="f-r2"></select><button class="btn danger" id="b-drain">Drain it</button></div>
   </section>
 
-  <section><h2>Make things go wrong</h2>
-    <div class="row"><select id="f-edge" aria-label="Walkway"></select><button class="danger" id="b-block">Block walkway</button></div>
-    <div class="row"><select id="f-robot1" aria-label="Robot to freeze"></select><button class="danger" id="b-freeze">Freeze robot</button></div>
-    <div class="row"><select id="f-robot2" aria-label="Robot to drain"></select><button class="danger" id="b-drain">Drain battery</button></div>
+  <section class="card">
+    <h2>What the system is doing</h2><p class="hint">Newest first</p>
+    <ul id="feed"><li class="empty">Nothing yet. Press Start to begin the day.</li></ul>
   </section>
 
-  <section><h2>Fleet size vs. longest wait</h2>
-    <svg id="chart" viewBox="0 0 330 150" width="100%" role="img" aria-label="Fleet sizing chart"></svg>
-  </section>
+  <section class="card"><h2>Robots</h2><p class="hint">Click one to find it on the map</p><div id="robots"></div></section>
 
-  <section style="display:flex;flex-direction:column;flex:1;min-height:0"><h2>What the system is doing</h2>
-    <ul id="feed"></ul>
+  <section class="card">
+    <h2>How many robots do we need?</h2><p class="hint" id="chart-note">Run the fleet-size test to see the answer.</p>
+    <svg id="chart" viewBox="0 0 340 170" width="100%" role="img" aria-label="Longest wait for each fleet size"></svg>
   </section>
 </aside>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// ---- Settings ----------------------------------------------------------
 const API = "http://localhost:8000";   // the lead's FastAPI server
-const POLL_MS = 500;                   // how often we ask for /state
-const TARGET_MIN = 15;                 // service target: no bin waits over 15 min
+const POLL_MS = 500, TARGET_MIN = 15;
+const STATE_TEXT = {IDLE:"Waiting",EN_ROUTE:"Heading to a bin",COLLECTING:"Emptying a bin",RETURNING:"Returning to dock",UNLOADING:"Unloading",CHARGING:"Charging",STUCK:"Stuck",ESCALATED:"Needs a human"};
+const STATE_COLOR = {STUCK:"#e04b36",ESCALATED:"#e04b36",CHARGING:"#2d6fd6",IDLE:"#5d6f78"};
+const SPEEDS = [["Slow",5],["Demo",12],["Fast",30],["Turbo",100]];
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const col = r => r.state in STATE_COLOR ? STATE_COLOR[r.state] : "#0f6b5e";
+const level = b => b.status === "overflowing" || b.fill_pct >= 100 ? 3 : b.fill_pct >= 80 ? 2 : b.fill_pct >= 60 ? 1 : 0;
+const LCOL = ["#2fa05a","#f0a81c","#e04b36","#e04b36"];
 
-// ---- Map ---------------------------------------------------------------
-const map = L.map("map").setView([32.8805, -117.2358], 16);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-  { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
+const map = L.map("map", {zoomSnap: .5}).setView([32.8805, -117.2358], 17);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  {maxZoom: 20, attribution: "&copy; OpenStreetMap, &copy; CARTO"}).addTo(map);
+map.on("zoomend", () => map.getContainer().classList.toggle("far", map.getZoom() < 16));
+const legend = L.control({position: "bottomleft"});
+legend.onAdd = () => { const d = L.DomUtil.create("div", "legend");
+  d.innerHTML = `<span><i style="background:#2fa05a"></i>Bin under 60% full</span><span><i style="background:#f0a81c"></i>Filling up (60–80%)</span><span><i style="background:#e04b36"></i>Needs pickup (80%+)</span><span><em></em>Blocked walkway</span>`; return d; };
+legend.addTo(map);
 
-const layers = { edges: {}, nodes: {}, bins: {}, robots: {} };
-let byId = {};          // node id -> node
-let fitted = false;
-let lastEventId = 0;
-let firstLoad = true;
-let usingSample = false;
-const $ = (id) => document.getElementById(id);
+const layers = {edges:{}, nodes:{}, bins:{}, robots:{}};
+const ringR = {};   // radius (m) of each building's ring of bins, so labels sit just outside it
+const mpp = () => 156543.03 * Math.cos(32.88 * Math.PI / 180) / Math.pow(2, map.getZoom());
+function bindLabel(l, id) { l.unbindTooltip(); l.bindTooltip(l._html || "", {permanent: true, direction: "bottom", className: "nlabel", offset: [0, 8 + (ringR[id] || 0) / mpp()]}); }
+map.on("zoomend", () => Object.entries(layers.nodes).forEach(([id, l]) => bindLabel(l, id)));
+let byId = {}, state = null, fitted = false, lastEventId = 0, firstLoad = true, usingSample = false;
 
-// Add new items, update existing ones, remove the ones that disappeared.
 function sync(group, items, make, update) {
   const seen = new Set();
-  for (const it of items) {
-    seen.add(it.id);
-    let l = group[it.id];
-    if (!l) { l = group[it.id] = make(it).addTo(map); }
-    update(l, it);
-  }
+  for (const it of items) { seen.add(it.id); let l = group[it.id]; if (!l) l = group[it.id] = make(it).addTo(map); update(l, it); }
   for (const id in group) if (!seen.has(id)) { map.removeLayer(group[id]); delete group[id]; }
 }
 
-const binColor = (b) => b.status === "overflowing" || b.fill_pct >= 80 ? "#d1432f"
-  : b.fill_pct >= 60 ? "#e0a21b" : "#3f9d5a";
-
-// ---- Data --------------------------------------------------------------
 async function getState() {
-  try {
-    const r = await fetch(API + "/state");
-    if (!r.ok) throw new Error("bad status");
-    usingSample = false;
-    return await r.json();
-  } catch (e) {
-    usingSample = true;
-    const r = await fetch("sample_state.json");
-    return await r.json();
-  }
+  try { const r = await fetch(API + "/state"); if (!r.ok) throw 0; usingSample = false; return await r.json(); }
+  catch (e) { usingSample = true; return await (await fetch("sample_state.json")).json(); }
 }
-
 async function post(path, body) {
-  try {
-    await fetch(API + path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: body ? JSON.stringify(body) : undefined
-    });
-  } catch (e) { banner("Server not reachable. Start the backend, then try again.", true); }
+  if (usingSample) return toast("Start the backend server to use the controls. You are viewing sample data.");
+  try { await fetch(API + path, {method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined}); }
+  catch (e) { toast("Could not reach the server.", true); }
 }
 
-// ---- Drawing -----------------------------------------------------------
 function render(s) {
-  byId = Object.fromEntries(s.nodes.map((n) => [n.id, n]));
+  state = s; byId = Object.fromEntries(s.nodes.map(n => [n.id, n]));
+  const groups = {}; s.bins.forEach(b => (groups[b.node_id] ??= []).push(b));
 
-  sync(layers.edges, s.edges.filter((e) => byId[e.from] && byId[e.to]),
-    (e) => L.polyline([[byId[e.from].lat, byId[e.from].lng], [byId[e.to].lat, byId[e.to].lng]]),
-    (l, e) => l.setStyle(e.blocked ? { color: "#d1432f", weight: 6, dashArray: "6 6" }
-                                   : { color: "#7c8b90", weight: 3, dashArray: null }));
+  sync(layers.edges, s.edges.filter(e => byId[e.from] && byId[e.to]),
+    e => L.polyline([[byId[e.from].lat, byId[e.from].lng], [byId[e.to].lat, byId[e.to].lng]]).bindTooltip(""),
+    (l, e) => { l.setStyle(e.blocked ? {color:"#e04b36", weight:6, dashArray:"7 7", opacity:.95} : {color:"#8da0a8", weight:3, dashArray:null, opacity:.8});
+                l.setTooltipContent(`${esc(byId[e.from].name)} to ${esc(byId[e.to].name)} · ${e.length_m} m${e.blocked ? " · BLOCKED" : ""}`); });
 
+  const items = [];   // bins sit in rings around their building (6 in the first ring, then 12, 18, ...)
+  for (const id in groups) { const nd = byId[id]; if (!nd) continue; const arr = groups[id]; let k = 0, ring = 1;
+    while (k < arr.length) { const cnt = Math.min(6 * ring, arr.length - k), r = 12 * ring;
+      for (let j = 0; j < cnt; j++, k++) { const a = 2 * Math.PI * j / cnt + ring;
+        items.push({...arr[k], _lat: nd.lat + r * Math.cos(a) / 111320, _lng: nd.lng + r * Math.sin(a) / (111320 * Math.cos(nd.lat * Math.PI / 180))}); }
+      ringR[id] = r; ring++; } }
+
+  const stats = {};
+  for (const id in groups) stats[id] = {worst: Math.max(...groups[id].map(level)), need: groups[id].filter(b => level(b) >= 2).length};
   sync(layers.nodes, s.nodes,
-    (n) => L.circleMarker([n.lat, n.lng], { radius: 4, color: "#1c2b30", fillColor: "#fff", fillOpacity: 1, weight: 2 }).bindTooltip(n.name),
-    () => {});
+    n => L.circleMarker([n.lat, n.lng], {radius: 6, weight: 3, fillColor: "#fff", fillOpacity: 1}),
+    (l, n) => { const st = stats[n.id] || {worst: 0, need: 0};
+                l.setStyle({color: LCOL[st.worst]});
+                l._html = esc(n.name) + (st.need ? `<em>${st.need}</em>` : "");
+                l.getTooltip() ? l.setTooltipContent(l._html) : bindLabel(l, n.id); });
 
-  // Bins that share a node get a small offset so they don't hide each other.
-  const perNode = {};
-  const binItems = s.bins.map((b) => {
-    const k = perNode[b.node_id] = (perNode[b.node_id] ?? -1) + 1;
-    return { ...b, _k: k };
-  });
-  sync(layers.bins, binItems,
-    (b) => { const n = byId[b.node_id] || { lat: 0, lng: 0 };
-             return L.circleMarker([n.lat + 0.00007 * b._k, n.lng + 0.00007 * b._k], { radius: 9, weight: 2, color: "#fff", fillOpacity: 0.95 }).bindTooltip(""); },
-    (l, b) => { l.setStyle({ fillColor: binColor(b) });
-                l.setTooltipContent(`Bin ${b.id}: ${Math.round(b.fill_pct)}% full (${b.status})`); });
+  sync(layers.bins, items,
+    b => L.marker([b._lat, b._lng], {icon: L.divIcon({className: "bin", html: '<div class="bd"></div>', iconSize: [12, 12]})}).bindTooltip(""),
+    (l, b) => { const lv = level(b), d = l.getElement()?.firstChild;
+                if (d) { d.style.background = LCOL[lv]; d.className = "bd" + (lv === 3 ? " over" : ""); }
+                l.setLatLng([b._lat, b._lng]);
+                l.setTooltipContent(`Bin ${esc(b.id)} at ${esc((byId[b.node_id] || {}).name || b.node_id)}<br>${Math.round(b.fill_pct)}% full${lv === 3 ? " (overflowing)" : lv === 2 ? " (needs pickup)" : ""}`); });
 
   sync(layers.robots, s.robots,
-    (r) => L.marker([r.lat, r.lng], { zIndexOffset: 1000, icon: L.divIcon({ className: "robot", html: "" }) }),
-    (l, r) => { l.setLatLng([r.lat, r.lng]);
-                const el = l.getElement();
-                if (el) { el.className = `leaflet-marker-icon leaflet-zoom-animated leaflet-interactive robot ${r.state}`;
-                          el.innerHTML = `${r.id}<span>${r.state} · ${Math.round(r.battery_pct)}%</span>`; } });
+    r => L.marker([r.lat, r.lng], {zIndexOffset: 1000, icon: L.divIcon({className: "robot", html: "", iconSize: null})}),
+    (l, r) => { l.setLatLng([r.lat, r.lng]); const el = l.getElement();
+                if (el) el.innerHTML = `<div class="rb" style="--c:${col(r)}"><b>${esc(r.id)}</b>${STATE_TEXT[r.state] || esc(r.state)}</div>`; });
 
-  if (!fitted && s.nodes.length) {
-    map.fitBounds(s.nodes.map((n) => [n.lat, n.lng]), { padding: [40, 40] });
-    fitted = true;
-  }
+  if (!fitted && s.nodes.length) { map.fitBounds(s.nodes.map(n => [n.lat, n.lng]), {padding: [60, 60]}); fitted = true; }
 
-  // Header and numbers
-  const t = new Date(s.sim_time);
-  $("clock").textContent = isNaN(t) ? s.sim_time : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const chip = $("chip");
-  chip.className = "chip" + (usingSample ? " sample" : s.running ? "" : " paused");
-  chip.textContent = usingSample ? "Sample data" : s.running ? "Running" : "Paused";
-
-  const k = s.kpis || {};
-  const ok = (s.fleet_sizing || []).filter((f) => f.max_wait_min <= TARGET_MIN);
-  $("k-needed").textContent = ok.length ? Math.min(...ok.map((f) => f.robots)) : "—";
-  $("k-over").textContent = k.overflow_minutes ?? "—";
-  $("k-wait").textContent = k.avg_wait_min ?? "—";
-  $("k-dist").textContent = k.distance_per_pickup_m ?? "—";
-
-  // Fault selects
-  fillSelect($("f-edge"), s.edges.map((e) => [e.id, `${(byId[e.from] || {}).name || e.from} to ${(byId[e.to] || {}).name || e.to}`]));
-  const robotOpts = s.robots.map((r) => [r.id, `Robot ${r.id}`]);
-  fillSelect($("f-robot1"), robotOpts);
-  fillSelect($("f-robot2"), robotOpts);
-
-  renderEvents(s.events || []);
-  renderChart(s.fleet_sizing || []);
+  header(s); numbers(s); robotList(s); controls(s); events(s.events || []); chart(s.fleet_sizing || []);
 }
 
-function fillSelect(sel, opts) {
-  const key = JSON.stringify(opts);
-  if (sel.dataset.key === key) return;          // don't rebuild while the user is picking
-  const cur = sel.value;
-  sel.innerHTML = "";
-  for (const [v, label] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); }
-  sel.dataset.key = key;
-  if (opts.some((o) => o[0] === cur)) sel.value = cur;
+function header(s) {
+  const t = new Date(s.sim_time), ok = !isNaN(t);
+  $("clock").textContent = ok ? t.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : "--:--";
+  $("day").style.width = ok ? ((t.getHours() * 60 + t.getMinutes()) / 1440 * 100) + "%" : "0";
+  const chip = $("chip"); chip.className = "chip" + (usingSample ? " sample" : s.running ? "" : " paused");
+  chip.lastChild.textContent = usingSample ? "Sample data" : s.running ? "Running" : "Paused";
+  if (!$("speeds").children.length) SPEEDS.forEach(([name, v]) => { const b = document.createElement("button"); b.textContent = name; b.dataset.v = v;
+    b.onclick = () => post("/sim/speed", {ticks_per_sec: v}); $("speeds").appendChild(b); });
+  const near = SPEEDS.reduce((a, c) => Math.abs(c[1] - s.speed) < Math.abs(a[1] - s.speed) ? c : a)[1];
+  [...$("speeds").children].forEach(b => b.classList.toggle("on", Number(b.dataset.v) === near));
 }
 
-function renderEvents(events) {
-  const fresh = events.filter((e) => e.id > lastEventId).sort((a, b) => a.id - b.id);
-  for (const e of fresh) {
-    const li = document.createElement("li");
-    const t = new Date(e.sim_time);
-    const small = document.createElement("small");
-    small.textContent = isNaN(t) ? "" : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    li.append(small, document.createTextNode(e.message));
-    const isAlert = /alert|escalat/.test(e.kind);
-    if (isAlert) { li.className = "alert"; if (!firstLoad) { banner(e.message, true); beep(); } }
-    $("feed").prepend(li);
-    lastEventId = e.id;
+function numbers(s) {
+  const k = s.kpis || {}, ok = (s.fleet_sizing || []).filter(f => f.max_wait_min <= TARGET_MIN);
+  $("k-needed").textContent = ok.length ? Math.min(...ok.map(f => f.robots)) : "—";
+  $("k-over").textContent = k.overflow_minutes ?? "—"; $("k-wait").textContent = k.avg_wait_min ?? "—"; $("k-dist").textContent = k.distance_per_pickup_m ?? "—";
+  const c = [0, 0, 0, 0]; s.bins.forEach(b => c[level(b)]++);
+  $("count").textContent = `${s.bins.length} bins across ${s.nodes.length} buildings`;
+  const names = ["Under 60%", "Filling up", "Needs pickup", "Overflowing"], colors = ["#2fa05a", "#f0a81c", "#e04b36", "#a8281a"];
+  $("stack").innerHTML = c.map((n, i) => `<i style="width:${n / Math.max(1, s.bins.length) * 100}%;background:${colors[i]}"></i>`).join("");
+  $("key").innerHTML = c.map((n, i) => `<span style="--c:${colors[i]}"><b>${n}</b> ${names[i]}</span>`).join("");
+}
+
+function robotList(s) {
+  const bar = (v, c) => `<span class="bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></i></span>`;
+  $("robots").innerHTML = s.robots.map(r => `<button class="rcard" data-id="${esc(r.id)}"><span class="av" style="background:${col(r)}">${esc(r.id)}</span>
+    <b>${STATE_TEXT[r.state] || esc(r.state)}</b><small>Battery ${Math.round(r.battery_pct)}% · Load ${Math.round(r.load_pct)}%</small>
+    ${bar(r.battery_pct, r.battery_pct < 25 ? "#e04b36" : "#2fa05a")}</button>`).join("");
+}
+$("robots").onclick = e => { const b = e.target.closest(".rcard"); const r = state && state.robots.find(x => x.id === b?.dataset.id); if (r) map.flyTo([r.lat, r.lng], 18); };
+
+function fill(sel, opts) {
+  const key = JSON.stringify(opts); if (sel.dataset.key === key) return;
+  const cur = sel.value; sel.innerHTML = opts.map(([v, t]) => `<option value="${esc(v)}">${esc(t)}</option>`).join(""); sel.dataset.key = key;
+  if (opts.some(o => o[0] === cur)) sel.value = cur;
+}
+function controls(s) {
+  fill($("f-edge"), s.edges.map(e => [e.id, `${(byId[e.from] || {}).name || e.from} to ${(byId[e.to] || {}).name || e.to}`]));
+  const ro = s.robots.map(r => [r.id, `Robot ${r.id}`]); fill($("f-r1"), ro); fill($("f-r2"), ro);
+}
+
+function events(list) {
+  for (const e of list.filter(e => e.id > lastEventId).sort((a, b) => a.id - b.id)) {
+    const li = document.createElement("li"), t = new Date(e.sim_time), small = document.createElement("small");
+    const kind = /alert|escalat/.test(e.kind) ? "alert" : /reroute/.test(e.kind) ? "reroute" : /fault/.test(e.kind) ? "fault" : "";
+    li.className = kind; small.textContent = isNaN(t) ? "" : t.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
+    li.append(document.createTextNode(e.message), small);
+    if (kind === "alert" && !firstLoad) { toast(e.message, true); beep(); }
+    $("feed").querySelector(".empty")?.remove(); $("feed").prepend(li); lastEventId = e.id;
   }
-  while ($("feed").children.length > 100) $("feed").lastChild.remove();
+  while ($("feed").children.length > 60) $("feed").lastChild.remove();
   firstLoad = false;
 }
 
-function renderChart(rows) {
+function chart(rows) {
   const svg = $("chart");
-  if (!rows.length) {
-    svg.innerHTML = `<text x="10" y="80" fill="#64767c" font-size="12">Run the fleet-sizing sweep to see this chart.</text>`;
-    return;
-  }
-  const max = Math.max(TARGET_MIN * 1.5, ...rows.map((r) => r.max_wait_min));
-  const W = 330, H = 150, pad = 28, bw = (W - pad - 10) / rows.length;
-  const y = (v) => H - pad - (v / max) * (H - pad - 10);
-  let out = `<line x1="${pad}" x2="${W - 5}" y1="${y(TARGET_MIN)}" y2="${y(TARGET_MIN)}" stroke="#d1432f" stroke-dasharray="4 3"/>
-             <text x="${W - 5}" y="${y(TARGET_MIN) - 3}" text-anchor="end" font-size="10" fill="#d1432f">${TARGET_MIN} min target</text>`;
-  rows.forEach((r, i) => {
-    const x = pad + i * bw + 4, h = H - pad - y(r.max_wait_min) + 0;
-    const good = r.max_wait_min <= TARGET_MIN;
-    out += `<rect x="${x}" y="${y(r.max_wait_min)}" width="${bw - 8}" height="${Math.max(h, 1)}" fill="${good ? "#0e7466" : "#b8c2c4"}"/>
-            <text x="${x + (bw - 8) / 2}" y="${H - 14}" text-anchor="middle" font-size="11" fill="#1c2b30">${r.robots}</text>`;
-  });
-  out += `<text x="${W / 2}" y="${H - 2}" text-anchor="middle" font-size="10" fill="#64767c">robots in the fleet (bar height = longest wait, min)</text>`;
-  svg.innerHTML = out;
+  if (!rows.length) { svg.innerHTML = ""; $("chart-note").textContent = "Run the fleet-size test to see the answer."; return; }
+  const ok = rows.filter(r => r.max_wait_min <= TARGET_MIN), best = ok.length ? Math.min(...ok.map(r => r.robots)) : null;
+  $("chart-note").textContent = best ? `${best} robots is the smallest fleet that keeps every bin's wait under ${TARGET_MIN} minutes.` : `No fleet size in the test met the ${TARGET_MIN}-minute goal.`;
+  const W = 340, H = 170, pl = 8, pb = 34, pt = 18, max = Math.max(TARGET_MIN * 1.6, ...rows.map(r => r.max_wait_min)), bw = (W - pl * 2) / rows.length;
+  const y = v => H - pb - v / max * (H - pb - pt);
+  let o = `<line x1="${pl}" x2="${W - pl}" y1="${y(TARGET_MIN)}" y2="${y(TARGET_MIN)}" stroke="#e04b36" stroke-dasharray="4 3"/><text x="${W - pl}" y="${y(TARGET_MIN) - 4}" text-anchor="end" font-size="10" fill="#e04b36">${TARGET_MIN} min goal</text>`;
+  rows.forEach((r, i) => { const x = pl + i * bw + 6, w = bw - 12, good = r.max_wait_min <= TARGET_MIN;
+    o += `<rect x="${x}" y="${y(r.max_wait_min)}" width="${w}" height="${Math.max(1, H - pb - y(r.max_wait_min))}" rx="4" fill="${good ? "#0f6b5e" : "#c5ced2"}"/>
+      <text x="${x + w / 2}" y="${y(r.max_wait_min) - 4}" text-anchor="middle" font-size="10" fill="#17232b">${Math.round(r.max_wait_min)}</text>
+      <text x="${x + w / 2}" y="${H - pb + 14}" text-anchor="middle" font-size="11" font-weight="600" fill="#17232b">${r.robots}</text>`; });
+  svg.innerHTML = o + `<text x="${W / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#5d6f78">robots in the fleet (bar = longest wait in minutes)</text>`;
 }
 
-// ---- Alerts ------------------------------------------------------------
-let bannerTimer;
-function banner(msg, show) {
-  const b = $("banner");
-  b.textContent = msg; b.style.display = show ? "block" : "none";
-  clearTimeout(bannerTimer);
-  if (show) bannerTimer = setTimeout(() => (b.style.display = "none"), 8000);
-}
-function beep() {
-  try {
-    const a = new (window.AudioContext || window.webkitAudioContext)();
-    const o = a.createOscillator(); o.frequency.value = 880; o.connect(a.destination);
-    o.start(); o.stop(a.currentTime + 0.25);
-  } catch (e) {}
-}
+let tt; function toast(msg, bad) { const t = $("toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block"; clearTimeout(tt); tt = setTimeout(() => t.style.display = "none", 7000); }
+function beep() { try { const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(); o.frequency.value = 880; o.connect(a.destination); o.start(); o.stop(a.currentTime + .25); } catch (e) {} }
 
-// ---- Buttons -----------------------------------------------------------
 $("b-start").onclick = () => post("/sim/start");
 $("b-pause").onclick = () => post("/sim/pause");
-$("b-reset").onclick = () => { lastEventId = 0; $("feed").innerHTML = ""; post("/sim/reset"); };
-$("speed").oninput = (e) => { $("speed-val").textContent = e.target.value; };
-$("speed").onchange = (e) => post("/sim/speed", { ticks_per_sec: Number(e.target.value) });
-$("b-block").onclick = () => post("/faults/block_edge", { edge_id: $("f-edge").value, minutes: 30 });
-$("b-freeze").onclick = () => post("/faults/freeze_robot", { robot_id: $("f-robot1").value });
-$("b-drain").onclick = () => post("/faults/drain_battery", { robot_id: $("f-robot2").value });
+$("b-reset").onclick = () => { lastEventId = 0; $("feed").innerHTML = '<li class="empty">Nothing yet. Press Start to begin the day.</li>'; post("/sim/reset"); };
+$("b-block").onclick = () => post("/faults/block_edge", {edge_id: $("f-edge").value, minutes: 30});
+$("b-freeze").onclick = () => post("/faults/freeze_robot", {robot_id: $("f-r1").value});
+$("b-drain").onclick = () => post("/faults/drain_battery", {robot_id: $("f-r2").value});
 
-// ---- Poll loop ---------------------------------------------------------
-async function tick() {
-  try { render(await getState()); } catch (e) { console.error(e); }
-  setTimeout(tick, POLL_MS);
-}
-tick();
+(async function tick() { try { render(await getState()); } catch (e) { console.error(e); } setTimeout(tick, POLL_MS); })();
 </script>
 </body>
 </html>
