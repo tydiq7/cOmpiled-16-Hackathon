@@ -1,0 +1,40 @@
+{
+  "sim_time": "2026-10-24T12:15:00",
+  "running": true,
+  "speed": 20,
+  "nodes": [
+    {"id": "price_center", "name": "Price Center", "lat": 32.8797, "lng": -117.2362},
+    {"id": "geisel", "name": "Geisel Library", "lat": 32.8811, "lng": -117.2376},
+    {"id": "library_walk", "name": "Library Walk", "lat": 32.8805, "lng": -117.2370},
+    {"id": "warren_mall", "name": "Warren Mall", "lat": 32.8826, "lng": -117.2340}
+  ],
+  "edges": [
+    {"id": "e1", "from": "price_center", "to": "library_walk", "length_m": 116.2, "blocked": false},
+    {"id": "e2", "from": "library_walk", "to": "geisel", "length_m": 87.1, "blocked": true},
+    {"id": "e3", "from": "library_walk", "to": "warren_mall", "length_m": 310.0, "blocked": false}
+  ],
+  "bins": [
+    {"id": "b1", "node_id": "price_center", "fill_pct": 82.5, "status": "needs_pickup"},
+    {"id": "b2", "node_id": "library_walk", "fill_pct": 45.0, "status": "ok"},
+    {"id": "b3", "node_id": "warren_mall", "fill_pct": 104.0, "status": "overflowing"}
+  ],
+  "docks": [
+    {"id": "d1", "node_id": "geisel", "slots": 2}
+  ],
+  "robots": [
+    {"id": "r1", "lat": 32.8804, "lng": -117.2369, "node_id": "geisel", "state": "EN_ROUTE",
+     "battery_pct": 64, "load_pct": 30, "route": ["b1"]},
+    {"id": "r2", "lat": 32.8811, "lng": -117.2376, "node_id": "geisel", "state": "IDLE",
+     "battery_pct": 100, "load_pct": 0, "route": []}
+  ],
+  "events": [
+    {"id": 100, "sim_time": "2026-10-24T12:10:00", "kind": "dispatch", "message": "Robot r1 dispatched to bin b1 (82% full)"},
+    {"id": 101, "sim_time": "2026-10-24T12:14:00", "kind": "reroute", "message": "Robot r1 rerouted: Library Walk blocked"}
+  ],
+  "kpis": {"robots_active": 4, "overflow_minutes": 0, "avg_wait_min": 6.2, "distance_per_pickup_m": 410},
+  "fleet_sizing": [
+    {"robots": 2, "avg_wait_min": 31.0, "max_wait_min": 74.0, "overflow_minutes": 95},
+    {"robots": 3, "avg_wait_min": 14.5, "max_wait_min": 29.0, "overflow_minutes": 12},
+    {"robots": 4, "avg_wait_min": 6.2, "max_wait_min": 13.0, "overflow_minutes": 0}
+  ]
+}
