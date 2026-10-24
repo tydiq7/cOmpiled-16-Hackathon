@@ -8,7 +8,7 @@ import json
 import random
 from datetime import datetime, timedelta
 
-from . import db, dispatcher, navigation as nav, seed_ucsd, supervisor
+from . import db, dispatcher, navigation as nav, sites, supervisor
 
 DAY_START = datetime(2026, 10, 24, 8, 0)
 DAY_END_MIN = 12 * 60  # 8 AM -> 8 PM
@@ -39,7 +39,10 @@ class World:
     COLLECT_MIN = 2
     UNLOAD_MIN = 3
 
-    def __init__(self, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
+    def __init__(self, site=None, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
+        self.site = site or sites.get(sites.DEFAULT_SITE_ID)
+        self.site_id = self.site.id
+        self._curve = self.site.fill_multiplier or fill_multiplier  # each venue has its own busy hours
         self.live = live
         self.use_optimizer = use_optimizer
         self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (1.0 if live else 0.2)
@@ -50,25 +53,25 @@ class World:
         self.events = []              # in-memory log (headless) -- live mode writes to SQLite
         self._event_id = 0
 
-        s = seed_ucsd
-        self.nodes = {n["id"]: dict(n) for n in s.NODES}
+        site = self.site
+        self.nodes = {n["id"]: dict(n) for n in site.nodes}
         self.edges = []
-        for e in s.EDGES:
+        for e in site.edges:
             a, b = self.nodes[e["from"]], self.nodes[e["to"]]
-            length = e.get("length_m") or round(db._haversine_m(a, b), 1)
-            self.edges.append({"id": e["id"], "from": e["from"], "to": e["to"], "length_m": length,
+            self.edges.append({"id": e["id"], "from": e["from"], "to": e["to"], "length_m": e["length_m"],
                                "blocked": False, "blocked_until": None,
                                "name": e.get("name") or f"{a['name']}-{b['name']}"})
         self.edge_by_id = {e["id"]: e for e in self.edges}
         self.graph = nav.build_graph(self.nodes.values(), self.edges)
 
         self.bins = [{"id": b["id"], "node_id": b["node_id"], "capacity_l": b["capacity_l"],
-                      "rate": b["fill_rate_pct_per_hr"], "fill_pct": self.rng.uniform(5, 40),
-                      "status": "ok", "last_emptied": None} for b in s.BINS]
+                      "rate": b["fill_rate_pct_per_hr"],
+                      "fill_pct": b["start_fill_pct"] if b.get("start_fill_pct") is not None else self.rng.uniform(5, 40),
+                      "status": "ok", "last_emptied": None} for b in site.bins]
         self.bin_by_id = {b["id"]: b for b in self.bins}
-        self.docks = [dict(d) for d in s.DOCKS]
+        self.docks = [dict(d) for d in site.docks]
 
-        robot_seed = list(s.ROBOTS)
+        robot_seed = list(site.robots)
         if num_robots is not None:  # headless sweeps: n robots spread over the docks
             robot_seed = [{"id": f"r{i + 1}", "node_id": self.docks[i % len(self.docks)]["node_id"]}
                           for i in range(num_robots)]
@@ -130,7 +133,7 @@ class World:
 
     def log(self, kind, message, robot_id=None, bin_id=None):
         if self.live:
-            db.add_event(self.sim_time(), kind, message, robot_id=robot_id, bin_id=bin_id)
+            db.add_event(self.site_id, self.sim_time(), kind, message, robot_id=robot_id, bin_id=bin_id)
         else:
             self._event_id += 1
             self.events.append({"id": self._event_id, "sim_time": self.sim_time(), "kind": kind,
@@ -187,7 +190,7 @@ class World:
         return True
 
     def current_fill_multiplier(self):
-        return fill_multiplier((DAY_START + timedelta(minutes=self.t)).hour)
+        return self._curve((DAY_START + timedelta(minutes=self.t)).hour)
 
     def _replan(self, r, blocked_name=None):
         """Recompute the path from where the robot will next be at a node."""
@@ -344,7 +347,7 @@ class World:
     def tick(self):
         self.t += 1
         hour = (DAY_START + timedelta(minutes=self.t)).hour
-        mult = fill_multiplier(hour)
+        mult = self._curve(hour)
         for e in self.edges:  # crowds disperse
             if e["blocked"] and e["blocked_until"] is not None and self.t >= e["blocked_until"]:
                 self.set_edge_blocked(e["id"], False)
@@ -403,33 +406,34 @@ class World:
 
     # ---- persistence ----------------------------------------------------------------------
     def persist(self):
+        sid = self.site_id
         with db.lock:
             c = db.conn()
-            c.executemany("UPDATE bins SET fill_pct=?, status=?, last_emptied_at=? WHERE id=?",
-                          [(b["fill_pct"], b["status"], b["last_emptied"] and self.sim_time(b["last_emptied"]), b["id"])
+            c.executemany("UPDATE bins SET fill_pct=?, status=?, last_emptied_at=? WHERE site_id=? AND id=?",
+                          [(b["fill_pct"], b["status"], b["last_emptied"] and self.sim_time(b["last_emptied"]), sid, b["id"])
                            for b in self.bins])
             c.executemany(
                 "UPDATE robots SET current_node_id=?, state=?, battery_pct=?, load_pct=?, task_id=?,"
-                " last_progress_at=?, lat=?, lng=?, route_json=? WHERE id=?",
+                " last_progress_at=?, lat=?, lng=?, route_json=? WHERE site_id=? AND id=?",
                 [(r["node"], r["state"], r["battery"], r["load"], r["task_id"], self.sim_time(r["last_progress"]),
-                  r["lat"], r["lng"], json.dumps(r["route"]), r["id"]) for r in self.robots])
-            c.executemany("UPDATE edges SET blocked=?, blocked_until=? WHERE id=?",
-                          [(int(e["blocked"]), e["blocked_until"] and self.sim_time(e["blocked_until"]), e["id"])
+                  r["lat"], r["lng"], json.dumps(r["route"]), sid, r["id"]) for r in self.robots])
+            c.executemany("UPDATE edges SET blocked=?, blocked_until=? WHERE site_id=? AND id=?",
+                          [(int(e["blocked"]), e["blocked_until"] and self.sim_time(e["blocked_until"]), sid, e["id"])
                            for e in self.edges])
             c.executemany(
-                "INSERT OR REPLACE INTO tasks (id, bin_id, robot_id, created_at, assigned_at, completed_at, status, attempts)"
-                " VALUES (?,?,?,?,?,?,?,?)",
-                [(t["id"], t["bin_id"], t["robot_id"], self.sim_time(t["created"]),
+                "INSERT OR REPLACE INTO tasks (site_id, id, bin_id, robot_id, created_at, assigned_at, completed_at, status, attempts)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                [(sid, t["id"], t["bin_id"], t["robot_id"], self.sim_time(t["created"]),
                   t["assigned"] is not None and self.sim_time(t["assigned"]) or None,
                   t["completed"] is not None and self.sim_time(t["completed"]) or None,
                   t["status"], t["attempts"]) for t in self.tasks])
-            c.execute("INSERT OR REPLACE INTO meta VALUES ('kpis', ?)", (json.dumps(self.kpis()),))
+            c.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)", (f"{sid}:kpis", json.dumps(self.kpis())))
             c.commit()
 
 
-def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True):
+def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True, site=None):
     """One full sim day with no database or dashboard. This is the `run_fn` for optimize.fleet_size_sweep."""
-    w = World(num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
+    w = World(site=site, num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
     for _ in range(minutes):
         w.tick()
     waits = w.final_waits() or [0]
