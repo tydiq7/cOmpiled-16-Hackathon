@@ -1,0 +1,224 @@
+{
+  "sim_time": "2026-10-24T12:15:00",
+  "running": true,
+  "speed": 20,
+  "nodes": [
+    {
+      "id": "price_center",
+      "name": "Price Center",
+      "lat": 32.8799,
+      "lng": -117.237
+    },
+    {
+      "id": "geisel",
+      "name": "Geisel Library",
+      "lat": 32.8811,
+      "lng": -117.2375
+    },
+    {
+      "id": "library_walk",
+      "name": "Library Walk",
+      "lat": 32.8802,
+      "lng": -117.2374
+    },
+    {
+      "id": "jacobs_hall",
+      "name": "Jacobs Hall",
+      "lat": 32.8818,
+      "lng": -117.2351
+    },
+    {
+      "id": "warren_mall",
+      "name": "Warren Mall",
+      "lat": 32.8811,
+      "lng": -117.2348
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "from": "geisel",
+      "to": "library_walk",
+      "length_m": 101,
+      "blocked": false
+    },
+    {
+      "id": "e2",
+      "from": "library_walk",
+      "to": "price_center",
+      "length_m": 50,
+      "blocked": true
+    },
+    {
+      "id": "e3",
+      "from": "geisel",
+      "to": "jacobs_hall",
+      "length_m": 237,
+      "blocked": false
+    },
+    {
+      "id": "e4",
+      "from": "jacobs_hall",
+      "to": "warren_mall",
+      "length_m": 83,
+      "blocked": false
+    },
+    {
+      "id": "e5",
+      "from": "warren_mall",
+      "to": "price_center",
+      "length_m": 245,
+      "blocked": false
+    }
+  ],
+  "bins": [
+    {
+      "id": "b1",
+      "node_id": "price_center",
+      "fill_pct": 82.5,
+      "status": "needs_pickup"
+    },
+    {
+      "id": "b2",
+      "node_id": "price_center",
+      "fill_pct": 55,
+      "status": "ok"
+    },
+    {
+      "id": "b3",
+      "node_id": "geisel",
+      "fill_pct": 68,
+      "status": "ok"
+    },
+    {
+      "id": "b4",
+      "node_id": "library_walk",
+      "fill_pct": 91,
+      "status": "assigned"
+    },
+    {
+      "id": "b5",
+      "node_id": "jacobs_hall",
+      "fill_pct": 30,
+      "status": "ok"
+    },
+    {
+      "id": "b6",
+      "node_id": "warren_mall",
+      "fill_pct": 104,
+      "status": "overflowing"
+    }
+  ],
+  "docks": [
+    {
+      "id": "d1",
+      "node_id": "geisel",
+      "slots": 2
+    },
+    {
+      "id": "d2",
+      "node_id": "warren_mall",
+      "slots": 2
+    }
+  ],
+  "robots": [
+    {
+      "id": "r1",
+      "lat": 32.8802,
+      "lng": -117.2374,
+      "node_id": "library_walk",
+      "state": "EN_ROUTE",
+      "battery_pct": 64,
+      "load_pct": 30,
+      "route": [
+        "b4"
+      ]
+    },
+    {
+      "id": "r2",
+      "lat": 32.8815,
+      "lng": -117.235,
+      "node_id": "jacobs_hall",
+      "state": "STUCK",
+      "battery_pct": 41,
+      "load_pct": 55,
+      "route": [
+        "b6"
+      ]
+    },
+    {
+      "id": "r3",
+      "lat": 32.8811,
+      "lng": -117.2375,
+      "node_id": "geisel",
+      "state": "CHARGING",
+      "battery_pct": 22,
+      "load_pct": 0,
+      "route": []
+    }
+  ],
+  "events": [
+    {
+      "id": 98,
+      "sim_time": "2026-10-24T12:02:00",
+      "kind": "dispatch",
+      "message": "Robot r1 assigned to bin b4 at Library Walk"
+    },
+    {
+      "id": 99,
+      "sim_time": "2026-10-24T12:08:00",
+      "kind": "fault",
+      "message": "Library Walk is blocked by a crowd"
+    },
+    {
+      "id": 100,
+      "sim_time": "2026-10-24T12:09:00",
+      "kind": "reroute",
+      "message": "Robot r1 rerouted: Library Walk blocked"
+    },
+    {
+      "id": 101,
+      "sim_time": "2026-10-24T12:14:00",
+      "kind": "escalate",
+      "message": "Robot r2 is stuck near Jacobs Hall. Task reassigned and a human was texted."
+    }
+  ],
+  "kpis": {
+    "robots_active": 3,
+    "overflow_minutes": 12,
+    "avg_wait_min": 6.2,
+    "distance_per_pickup_m": 410
+  },
+  "fleet_sizing": [
+    {
+      "robots": 2,
+      "avg_wait_min": 31.0,
+      "max_wait_min": 74.0,
+      "overflow_minutes": 95
+    },
+    {
+      "robots": 3,
+      "avg_wait_min": 14.5,
+      "max_wait_min": 29.0,
+      "overflow_minutes": 12
+    },
+    {
+      "robots": 4,
+      "avg_wait_min": 7.1,
+      "max_wait_min": 14.0,
+      "overflow_minutes": 0
+    },
+    {
+      "robots": 5,
+      "avg_wait_min": 5.0,
+      "max_wait_min": 11.0,
+      "overflow_minutes": 0
+    },
+    {
+      "robots": 6,
+      "avg_wait_min": 4.2,
+      "max_wait_min": 9.0,
+      "overflow_minutes": 0
+    }
+  ]
+}

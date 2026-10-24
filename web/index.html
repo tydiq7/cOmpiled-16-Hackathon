@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Waste Fleet Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--ink:#1c2b30;--mute:#64767c;--paper:#f5f6f2;--card:#fff;--line:#d9ded8;--teal:#0e7466;--ok:#3f9d5a;--warn:#e0a21b;--bad:#d1432f}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);display:grid;grid-template-columns:1fr 360px}
+#map{height:100vh}
+aside{height:100vh;overflow-y:auto;padding:14px;border-left:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+h1{font-size:17px;margin:0}
+h2{font-size:13px;margin:0 0 6px;color:var(--mute);font-weight:600}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{padding:2px 9px;border-radius:99px;background:var(--teal);color:#fff;font-size:12px}
+.chip.sample{background:var(--warn);color:#000}
+.chip.paused{background:var(--mute)}
+#clock{font-size:22px;font-weight:700}
+.kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.kpi b{display:block;font-size:22px}
+.kpi span{color:var(--mute);font-size:12px}
+.row{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+.row select{flex:1;min-width:0}
+button,select{font:inherit;padding:5px 9px;border:1px solid var(--line);border-radius:6px;background:var(--card);color:var(--ink)}
+button{cursor:pointer}
+button:hover{border-color:var(--teal)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+button.go{background:var(--teal);color:#fff;border-color:var(--teal)}
+button.danger{border-color:var(--bad);color:var(--bad)}
+input[type=range]{flex:1}
+#feed{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1;min-height:140px;border:1px solid var(--line);border-radius:6px;background:var(--card)}
+#feed li{padding:6px 9px;border-bottom:1px solid var(--line)}
+#feed li small{color:var(--mute);margin-right:6px}
+#feed li.alert{background:#fde8e4;font-weight:600}
+#banner{position:fixed;top:12px;left:12px;right:384px;z-index:1000;background:var(--bad);color:#fff;padding:10px 14px;border-radius:6px;font-weight:600;display:none}
+.robot{background:var(--ink);color:#fff;border-radius:6px;padding:2px 6px;font-size:11px;line-height:1.2;white-space:nowrap;width:auto!important;height:auto!important;transform-origin:center;transition:transform .5s linear}
+.robot span{display:block;font-weight:400;opacity:.8}
+.robot.STUCK,.robot.ESCALATED{background:var(--bad)}
+.robot.CHARGING{background:var(--teal)}
+.leaflet-marker-icon.robot{transition:transform .5s linear}
+@media(max-width:800px){body{grid-template-columns:1fr;grid-template-rows:50vh auto}#map{height:50vh}aside{height:auto;border-left:0}#banner{right:12px}}
+</style>
+</head>
+<body>
+<div id="banner" role="alert"></div>
+<div id="map"></div>
+<aside>
+  <div class="top"><h1>Autonomous Waste Fleet</h1><span id="chip" class="chip">Loading</span></div>
+  <div id="clock">--:--</div>
+
+  <section><h2>Key numbers</h2>
+    <div class="kpis">
+      <div class="kpi"><b id="k-needed">—</b><span>Robots needed</span></div>
+      <div class="kpi"><b id="k-over">—</b><span>Overflow minutes</span></div>
+      <div class="kpi"><b id="k-wait">—</b><span>Average wait (min)</span></div>
+      <div class="kpi"><b id="k-dist">—</b><span>Distance per pickup (m)</span></div>
+    </div>
+  </section>
+
+  <section><h2>Simulation</h2>
+    <div class="row">
+      <button class="go" id="b-start">Start</button>
+      <button id="b-pause">Pause</button>
+      <button id="b-reset">Reset</button>
+    </div>
+    <div class="row"><label for="speed">Speed</label>
+      <input id="speed" type="range" min="1" max="100" value="20"><span id="speed-val">20</span>
+    </div>
+  </section>
+
+  <section><h2>Make things go wrong</h2>
+    <div class="row"><select id="f-edge" aria-label="Walkway"></select><button class="danger" id="b-block">Block walkway</button></div>
+    <div class="row"><select id="f-robot1" aria-label="Robot to freeze"></select><button class="danger" id="b-freeze">Freeze robot</button></div>
+    <div class="row"><select id="f-robot2" aria-label="Robot to drain"></select><button class="danger" id="b-drain">Drain battery</button></div>
+  </section>
+
+  <section><h2>Fleet size vs. longest wait</h2>
+    <svg id="chart" viewBox="0 0 330 150" width="100%" role="img" aria-label="Fleet sizing chart"></svg>
+  </section>
+
+  <section style="display:flex;flex-direction:column;flex:1;min-height:0"><h2>What the system is doing</h2>
+    <ul id="feed"></ul>
+  </section>
+</aside>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---- Settings ----------------------------------------------------------
+const API = "http://localhost:8000";   // the lead's FastAPI server
+const POLL_MS = 500;                   // how often we ask for /state
+const TARGET_MIN = 15;                 // service target: no bin waits over 15 min
+
+// ---- Map ---------------------------------------------------------------
+const map = L.map("map").setView([32.8805, -117.2358], 16);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  { maxZoom: 19, attribution: "&copy; OpenStreetMap" }).addTo(map);
+
+const layers = { edges: {}, nodes: {}, bins: {}, robots: {} };
+let byId = {};          // node id -> node
+let fitted = false;
+let lastEventId = 0;
+let firstLoad = true;
+let usingSample = false;
+const $ = (id) => document.getElementById(id);
+
+// Add new items, update existing ones, remove the ones that disappeared.
+function sync(group, items, make, update) {
+  const seen = new Set();
+  for (const it of items) {
+    seen.add(it.id);
+    let l = group[it.id];
+    if (!l) { l = group[it.id] = make(it).addTo(map); }
+    update(l, it);
+  }
+  for (const id in group) if (!seen.has(id)) { map.removeLayer(group[id]); delete group[id]; }
+}
+
+const binColor = (b) => b.status === "overflowing" || b.fill_pct >= 80 ? "#d1432f"
+  : b.fill_pct >= 60 ? "#e0a21b" : "#3f9d5a";
+
+// ---- Data --------------------------------------------------------------
+async function getState() {
+  try {
+    const r = await fetch(API + "/state");
+    if (!r.ok) throw new Error("bad status");
+    usingSample = false;
+    return await r.json();
+  } catch (e) {
+    usingSample = true;
+    const r = await fetch("sample_state.json");
+    return await r.json();
+  }
+}
+
+async function post(path, body) {
+  try {
+    await fetch(API + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  } catch (e) { banner("Server not reachable. Start the backend, then try again.", true); }
+}
+
+// ---- Drawing -----------------------------------------------------------
+function render(s) {
+  byId = Object.fromEntries(s.nodes.map((n) => [n.id, n]));
+
+  sync(layers.edges, s.edges.filter((e) => byId[e.from] && byId[e.to]),
+    (e) => L.polyline([[byId[e.from].lat, byId[e.from].lng], [byId[e.to].lat, byId[e.to].lng]]),
+    (l, e) => l.setStyle(e.blocked ? { color: "#d1432f", weight: 6, dashArray: "6 6" }
+                                   : { color: "#7c8b90", weight: 3, dashArray: null }));
+
+  sync(layers.nodes, s.nodes,
+    (n) => L.circleMarker([n.lat, n.lng], { radius: 4, color: "#1c2b30", fillColor: "#fff", fillOpacity: 1, weight: 2 }).bindTooltip(n.name),
+    () => {});
+
+  // Bins that share a node get a small offset so they don't hide each other.
+  const perNode = {};
+  const binItems = s.bins.map((b) => {
+    const k = perNode[b.node_id] = (perNode[b.node_id] ?? -1) + 1;
+    return { ...b, _k: k };
+  });
+  sync(layers.bins, binItems,
+    (b) => { const n = byId[b.node_id] || { lat: 0, lng: 0 };
+             return L.circleMarker([n.lat + 0.00007 * b._k, n.lng + 0.00007 * b._k], { radius: 9, weight: 2, color: "#fff", fillOpacity: 0.95 }).bindTooltip(""); },
+    (l, b) => { l.setStyle({ fillColor: binColor(b) });
+                l.setTooltipContent(`Bin ${b.id}: ${Math.round(b.fill_pct)}% full (${b.status})`); });
+
+  sync(layers.robots, s.robots,
+    (r) => L.marker([r.lat, r.lng], { zIndexOffset: 1000, icon: L.divIcon({ className: "robot", html: "" }) }),
+    (l, r) => { l.setLatLng([r.lat, r.lng]);
+                const el = l.getElement();
+                if (el) { el.className = `leaflet-marker-icon leaflet-zoom-animated leaflet-interactive robot ${r.state}`;
+                          el.innerHTML = `${r.id}<span>${r.state} · ${Math.round(r.battery_pct)}%</span>`; } });
+
+  if (!fitted && s.nodes.length) {
+    map.fitBounds(s.nodes.map((n) => [n.lat, n.lng]), { padding: [40, 40] });
+    fitted = true;
+  }
+
+  // Header and numbers
+  const t = new Date(s.sim_time);
+  $("clock").textContent = isNaN(t) ? s.sim_time : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const chip = $("chip");
+  chip.className = "chip" + (usingSample ? " sample" : s.running ? "" : " paused");
+  chip.textContent = usingSample ? "Sample data" : s.running ? "Running" : "Paused";
+
+  const k = s.kpis || {};
+  const ok = (s.fleet_sizing || []).filter((f) => f.max_wait_min <= TARGET_MIN);
+  $("k-needed").textContent = ok.length ? Math.min(...ok.map((f) => f.robots)) : "—";
+  $("k-over").textContent = k.overflow_minutes ?? "—";
+  $("k-wait").textContent = k.avg_wait_min ?? "—";
+  $("k-dist").textContent = k.distance_per_pickup_m ?? "—";
+
+  // Fault selects
+  fillSelect($("f-edge"), s.edges.map((e) => [e.id, `${(byId[e.from] || {}).name || e.from} to ${(byId[e.to] || {}).name || e.to}`]));
+  const robotOpts = s.robots.map((r) => [r.id, `Robot ${r.id}`]);
+  fillSelect($("f-robot1"), robotOpts);
+  fillSelect($("f-robot2"), robotOpts);
+
+  renderEvents(s.events || []);
+  renderChart(s.fleet_sizing || []);
+}
+
+function fillSelect(sel, opts) {
+  const key = JSON.stringify(opts);
+  if (sel.dataset.key === key) return;          // don't rebuild while the user is picking
+  const cur = sel.value;
+  sel.innerHTML = "";
+  for (const [v, label] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = label; sel.appendChild(o); }
+  sel.dataset.key = key;
+  if (opts.some((o) => o[0] === cur)) sel.value = cur;
+}
+
+function renderEvents(events) {
+  const fresh = events.filter((e) => e.id > lastEventId).sort((a, b) => a.id - b.id);
+  for (const e of fresh) {
+    const li = document.createElement("li");
+    const t = new Date(e.sim_time);
+    const small = document.createElement("small");
+    small.textContent = isNaN(t) ? "" : t.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    li.append(small, document.createTextNode(e.message));
+    const isAlert = /alert|escalat/.test(e.kind);
+    if (isAlert) { li.className = "alert"; if (!firstLoad) { banner(e.message, true); beep(); } }
+    $("feed").prepend(li);
+    lastEventId = e.id;
+  }
+  while ($("feed").children.length > 100) $("feed").lastChild.remove();
+  firstLoad = false;
+}
+
+function renderChart(rows) {
+  const svg = $("chart");
+  if (!rows.length) {
+    svg.innerHTML = `<text x="10" y="80" fill="#64767c" font-size="12">Run the fleet-sizing sweep to see this chart.</text>`;
+    return;
+  }
+  const max = Math.max(TARGET_MIN * 1.5, ...rows.map((r) => r.max_wait_min));
+  const W = 330, H = 150, pad = 28, bw = (W - pad - 10) / rows.length;
+  const y = (v) => H - pad - (v / max) * (H - pad - 10);
+  let out = `<line x1="${pad}" x2="${W - 5}" y1="${y(TARGET_MIN)}" y2="${y(TARGET_MIN)}" stroke="#d1432f" stroke-dasharray="4 3"/>
+             <text x="${W - 5}" y="${y(TARGET_MIN) - 3}" text-anchor="end" font-size="10" fill="#d1432f">${TARGET_MIN} min target</text>`;
+  rows.forEach((r, i) => {
+    const x = pad + i * bw + 4, h = H - pad - y(r.max_wait_min) + 0;
+    const good = r.max_wait_min <= TARGET_MIN;
+    out += `<rect x="${x}" y="${y(r.max_wait_min)}" width="${bw - 8}" height="${Math.max(h, 1)}" fill="${good ? "#0e7466" : "#b8c2c4"}"/>
+            <text x="${x + (bw - 8) / 2}" y="${H - 14}" text-anchor="middle" font-size="11" fill="#1c2b30">${r.robots}</text>`;
+  });
+  out += `<text x="${W / 2}" y="${H - 2}" text-anchor="middle" font-size="10" fill="#64767c">robots in the fleet (bar height = longest wait, min)</text>`;
+  svg.innerHTML = out;
+}
+
+// ---- Alerts ------------------------------------------------------------
+let bannerTimer;
+function banner(msg, show) {
+  const b = $("banner");
+  b.textContent = msg; b.style.display = show ? "block" : "none";
+  clearTimeout(bannerTimer);
+  if (show) bannerTimer = setTimeout(() => (b.style.display = "none"), 8000);
+}
+function beep() {
+  try {
+    const a = new (window.AudioContext || window.webkitAudioContext)();
+    const o = a.createOscillator(); o.frequency.value = 880; o.connect(a.destination);
+    o.start(); o.stop(a.currentTime + 0.25);
+  } catch (e) {}
+}
+
+// ---- Buttons -----------------------------------------------------------
+$("b-start").onclick = () => post("/sim/start");
+$("b-pause").onclick = () => post("/sim/pause");
+$("b-reset").onclick = () => { lastEventId = 0; $("feed").innerHTML = ""; post("/sim/reset"); };
+$("speed").oninput = (e) => { $("speed-val").textContent = e.target.value; };
+$("speed").onchange = (e) => post("/sim/speed", { ticks_per_sec: Number(e.target.value) });
+$("b-block").onclick = () => post("/faults/block_edge", { edge_id: $("f-edge").value, minutes: 30 });
+$("b-freeze").onclick = () => post("/faults/freeze_robot", { robot_id: $("f-robot1").value });
+$("b-drain").onclick = () => post("/faults/drain_battery", { robot_id: $("f-robot2").value });
+
+// ---- Poll loop ---------------------------------------------------------
+async function tick() {
+  try { render(await getState()); } catch (e) { console.error(e); }
+  setTimeout(tick, POLL_MS);
+}
+tick();
+</script>
+</body>
+</html>

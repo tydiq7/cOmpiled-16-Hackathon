@@ -1,36 +1,84 @@
-"""Campus seed data. OWNED BY TEAMMATE 1 -- this is a placeholder so the backend can run.
+"""Seed data for the UCSD campus site.
 
-Teammate 1: replace the contents with 12-15 real UCSD spots, keeping these six
-module-level names and these exact field names (db.reset_db() reads them).
+Coordinates: Geisel Library and Price Center come from published sources; the rest
+are estimated from map labels (within roughly 25 m). Good enough for the demo.
+To refine one, right-click the spot in Google Maps and paste its numbers here.
 """
+from math import asin, cos, radians, sin, sqrt
 
-SITE = {"id": "ucsd", "name": "UCSD", "center_lat": 32.8801, "center_lng": -117.2340}
+SITE = {"id": "ucsd", "name": "UCSD campus", "center_lat": 32.8801, "center_lng": -117.2340}
 
+# (id, display name, lat, lng)
 NODES = [
-    {"id": "price_center", "name": "Price Center", "lat": 32.8797, "lng": -117.2362},
-    {"id": "geisel", "name": "Geisel Library", "lat": 32.8811, "lng": -117.2376},
-    {"id": "warren_mall", "name": "Warren Mall", "lat": 32.8826, "lng": -117.2340},
-    {"id": "library_walk", "name": "Library Walk", "lat": 32.8805, "lng": -117.2370},
+    ("price_center", "Price Center", 32.8799, -117.2370),
+    ("geisel", "Geisel Library", 32.8811, -117.2375),
+    ("library_walk", "Library Walk", 32.8802, -117.2374),
+    ("jacobs_hall", "Jacobs Hall", 32.8818, -117.2351),
+    ("warren_mall", "Warren Mall", 32.8811, -117.2348),
+    ("atkinson_hall", "Atkinson Hall", 32.8825, -117.2347),
+    ("warren_lecture", "Warren Lecture Hall", 32.8805, -117.2344),
+    ("serf", "Engineering Research Facility", 32.8798, -117.2350),
+    ("matthews_quad", "Matthews Quad", 32.8791, -117.2353),
+    ("conrad_prebys", "Conrad Prebys Music Center", 32.8782, -117.2347),
+    ("student_health", "Student Health Services", 32.8792, -117.2380),
+    ("career_services", "Career Services Center", 32.8785, -117.2378),
+    ("sun_god_lawn", "Sun God Lawn", 32.8787, -117.2401),
 ]
 
-# length_m is computed from lat/lng by db.reset_db() when omitted
-EDGES = [
-    {"id": "e1", "from": "price_center", "to": "library_walk"},
-    {"id": "e2", "from": "library_walk", "to": "geisel"},
-    {"id": "e3", "from": "library_walk", "to": "warren_mall"},
+# pairs of node ids that connect by walkway; length is computed below
+EDGE_PAIRS = [
+    ("geisel", "library_walk"),
+    ("library_walk", "price_center"),
+    ("library_walk", "student_health"),
+    ("student_health", "career_services"),
+    ("student_health", "sun_god_lawn"),
+    ("price_center", "matthews_quad"),
+    ("price_center", "serf"),
+    ("price_center", "warren_lecture"),
+    ("matthews_quad", "serf"),
+    ("matthews_quad", "conrad_prebys"),
+    ("serf", "warren_mall"),
+    ("warren_mall", "warren_lecture"),
+    ("warren_mall", "jacobs_hall"),
+    ("jacobs_hall", "atkinson_hall"),
+    ("geisel", "jacobs_hall"),
 ]
 
+# (bin id, node id, capacity in liters, starting fill %, fill rate in % per hour)
 BINS = [
-    {"id": "b1", "node_id": "price_center", "capacity_l": 120, "fill_rate_pct_per_hr": 16.0},
-    {"id": "b2", "node_id": "library_walk", "capacity_l": 120, "fill_rate_pct_per_hr": 14.0},
-    {"id": "b3", "node_id": "warren_mall", "capacity_l": 120, "fill_rate_pct_per_hr": 12.0},
+    ("b1", "price_center", 240, 20, 9),
+    ("b2", "price_center", 240, 15, 8),
+    ("b3", "geisel", 240, 25, 6),
+    ("b4", "library_walk", 240, 30, 7),
+    ("b5", "warren_mall", 240, 10, 5),
+    ("b6", "jacobs_hall", 240, 18, 4),
+    ("b7", "matthews_quad", 240, 22, 6),
+    ("b8", "serf", 240, 12, 4),
+    ("b9", "sun_god_lawn", 240, 8, 3),
 ]
 
-DOCKS = [
-    {"id": "d1", "node_id": "geisel", "slots": 2},
+# (dock id, node id, slots)
+DOCKS = [("d1", "geisel", 2), ("d2", "warren_mall", 2)]
+
+# (robot id, starting node id)
+ROBOTS = [("r1", "geisel"), ("r2", "geisel"), ("r3", "warren_mall"), ("r4", "warren_mall")]
+
+
+def _meters(a, b):
+    """Straight-line walking distance between two lat/lng points (haversine)."""
+    lat1, lng1, lat2, lng2 = map(radians, (a[0], a[1], b[0], b[1]))
+    h = sin((lat2 - lat1) / 2) ** 2 + cos(lat1) * cos(lat2) * sin((lng2 - lng1) / 2) ** 2
+    return round(2 * 6371000 * asin(sqrt(h)))
+
+
+_pos = {n[0]: (n[2], n[3]) for n in NODES}
+EDGES = [
+    (f"e{i + 1}", a, b, _meters(_pos[a], _pos[b]))
+    for i, (a, b) in enumerate(EDGE_PAIRS)
 ]
 
-ROBOTS = [
-    {"id": "r1", "node_id": "geisel"},
-    {"id": "r2", "node_id": "geisel"},
-]
+if __name__ == "__main__":
+    print(f"{len(NODES)} nodes, {len(EDGES)} edges, {len(BINS)} bins, "
+          f"{len(DOCKS)} docks, {len(ROBOTS)} robots")
+    for e in EDGES:
+        print(e)
