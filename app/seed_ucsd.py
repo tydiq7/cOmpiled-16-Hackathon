@@ -110,6 +110,11 @@ EDGES = [(f"e{i + 1}", a, b, _meters(_pos[a], _pos[b])) for i, (a, b) in enumera
 if __name__ == "__main__":
     print(f"{len(NODES)} nodes, {len(EDGES)} edges, {len(BINS)} bins, "
           f"{len(DOCKS)} docks, {len(ROBOTS)} robots")
+<<<<<<< HEAD
     for b in BUILDINGS:
         n = sum(1 for x in BINS if x[1] == b[0])
         print(f"  {b[1]:<38} traffic {b[4]}  bins {n}  base rate {b[6]}%/hr")
+=======
+    for e in EDGES:
+        print(e)
+>>>>>>> 069c3982d6627cb81567c48fa1186fae14591e84
