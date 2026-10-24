@@ -21,9 +21,9 @@ EDGES = [
 ]
 
 BINS = [
-    {"id": "b1", "node_id": "price_center", "capacity_l": 120, "fill_rate_pct_per_hr": 6.0},
-    {"id": "b2", "node_id": "library_walk", "capacity_l": 120, "fill_rate_pct_per_hr": 5.0},
-    {"id": "b3", "node_id": "warren_mall", "capacity_l": 120, "fill_rate_pct_per_hr": 4.0},
+    {"id": "b1", "node_id": "price_center", "capacity_l": 120, "fill_rate_pct_per_hr": 16.0},
+    {"id": "b2", "node_id": "library_walk", "capacity_l": 120, "fill_rate_pct_per_hr": 14.0},
+    {"id": "b3", "node_id": "warren_mall", "capacity_l": 120, "fill_rate_pct_per_hr": 12.0},
 ]
 
 DOCKS = [
