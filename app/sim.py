@@ -45,7 +45,7 @@ class World:
         self._curve = self.site.fill_multiplier or fill_multiplier  # each venue has its own busy hours
         self.live = live
         self.use_optimizer = use_optimizer
-        self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (1.0 if live else 0.2)
+        self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (0.3 if live else 0.05)
         self.rng = random.Random(seed)
         self.t = 0                    # sim minutes since DAY_START
         self.running = False
