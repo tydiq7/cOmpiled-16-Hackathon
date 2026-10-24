@@ -6,10 +6,12 @@ from . import navigation as nav, optimize
 PICKUP_THRESHOLD = 80.0  # bin becomes needs_pickup at this fill level
 BATTERY_MARGIN_PCT = 5.0
 PLAN_EVERY_MIN = 5         # batch window for optimizer plans
+MIN_PLAN_GAP_MIN = 2       # never re-plan more often than this, even when bins are urgent (solver cost)
 URGENT_FILL_PCT = 95.0     # plan immediately if a waiting bin is this full
 EXTRA_BIN_PCT = 60.0       # bins this full and near a pickup ride along on the same trip
 EXTRA_BIN_RADIUS_M = 300.0
 BALANCE_WEIGHT = 1000      # spread bins across robots instead of chaining them on one (tuned in headless sweeps)
+MAX_PLAN_STOPS = 80        # most urgent stops handed to the solver, so huge sites stay fast
 GREEDY_AFTER_MIN = 2 * PLAN_EVERY_MIN  # a task the planner can't place this long gets the greedy treatment
 
 
@@ -35,10 +37,13 @@ def plan_with_optimizer(w):
             and r["battery"] > w.LOW_BATTERY_PCT]
     if not open_tasks or not idle:
         return True  # nothing to do is not a failure
+    if w.t - w.__dict__.get("last_plan_t", -10**9) < MIN_PLAN_GAP_MIN:
+        return True
     urgent = any(w.bin_by_id[t["bin_id"]]["fill_pct"] >= URGENT_FILL_PCT for t in open_tasks)
     if not urgent and w.t % PLAN_EVERY_MIN != 0:
         return True  # wait for the batch window
-    stops = _candidate_stops(w, open_tasks)
+    w.last_plan_t = w.t
+    stops = _candidate_stops(w, open_tasks)[:MAX_PLAN_STOPS]
     robots = []
     for r in idle:
         dock = w.nearest_dock(r["node"])
@@ -68,6 +73,7 @@ def plan_with_optimizer(w):
 def _candidate_stops(w, open_tasks):
     """Open pickups plus nearly-full bins close to one of them."""
     stops, seen = [], set()
+    open_tasks = sorted(open_tasks, key=lambda t: -w.bin_by_id[t["bin_id"]]["fill_pct"])  # fullest first
     for t in open_tasks:
         b = w.bin_by_id[t["bin_id"]]
         stops.append({"bin_id": b["id"], "node": b["node_id"], "demand": w.bin_demand_pct(b)})

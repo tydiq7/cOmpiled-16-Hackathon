@@ -11,11 +11,30 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from . import db, optimize, sites
-from .sim import World, run_headless
+from concurrent.futures import ProcessPoolExecutor
+
+from . import db, sites
+from .sim import World
+from .sweep import sweep_site
 
 DEFAULT = sites.DEFAULT_SITE_ID
-STATE = {"worlds": {}, "sweeps": {}, "sweeping": set()}
+_POOL = ProcessPoolExecutor(max_workers=1)  # sweeps run in their own process, away from the live API
+STATE = {"worlds": {}, "sweeps": {}, "sweeping": set(), "snapshots": {}}
+
+
+def refresh(site_id):
+    """Rebuild the /state snapshot for one site. Call with db.lock held, after the world was persisted."""
+    w = STATE["worlds"][site_id]
+    STATE["snapshots"][site_id] = db.get_state(site_id, w.sim_time(), w.running, w.speed)
+
+
+def tick_site(site_id):
+    """One sim tick plus a fresh snapshot (runs in a worker thread so the API stays responsive)."""
+    w = STATE["worlds"][site_id]
+    with db.lock:
+        if w is STATE["worlds"][site_id]:  # skip if the site was reset while we waited
+            w.tick()
+            refresh(site_id)
 
 
 def new_world(site_id):
@@ -27,22 +46,8 @@ def new_world(site_id):
         if STATE["sweeps"].get(site_id):  # reset wipes meta; keep a finished sweep
             db.set_meta(site_id, "fleet_sizing", STATE["sweeps"][site_id]["results"])
         STATE["worlds"][site_id] = w
+        refresh(site_id)
     return w
-
-
-SWEEP_SEEDS = int(os.environ.get("SWEEP_SEEDS", "5"))   # simulated days per fleet size
-SWEEP_REQUIRED_SHARE = 0.8                               # recommend the smallest fleet that meets the target on this share of days
-
-
-def _sweep(site):
-    """Multi-seed fleet-sizing study, shaped into Contract 1 `fleet_sizing` rows (extra fields ride along)."""
-    run = lambda n, seed: run_headless(n, seed, site=site)
-    study = optimize.fleet_size_study(run, seeds=range(SWEEP_SEEDS), required_share=SWEEP_REQUIRED_SHARE)
-    rows = [{"robots": r["robots"], "avg_wait_min": round(r["avg_wait_min"], 1),
-             "max_wait_min": round(r["max_wait_p95"], 1), "overflow_minutes": round(r["overflow_minutes"], 1),
-             "avg_wait_ci95": round(r["avg_wait_ci95"], 1), "share_meeting_target": round(r["share_meeting_target"], 2),
-             "n_seeds": r["n_seeds"]} for r in study["results"]]
-    return {"results": rows, "recommended": study["recommended"]}
 
 
 async def run_sweep(site_id):
@@ -51,8 +56,7 @@ async def run_sweep(site_id):
         return
     STATE["sweeping"].add(site_id)
     try:
-        site = sites.get(site_id)
-        result = await asyncio.to_thread(_sweep, site)
+        result = await asyncio.get_running_loop().run_in_executor(_POOL, sweep_site, site_id)
         STATE["sweeps"][site_id] = result
         with db.lock:
             db.set_meta(site_id, "fleet_sizing", result["results"])
@@ -64,12 +68,13 @@ async def run_sweep(site_id):
 
 
 async def sim_loop(site_id):
+    loop = asyncio.get_running_loop()
     while True:
         w = STATE["worlds"][site_id]
         if w.running:
-            with db.lock:
-                w.tick()
-            await asyncio.sleep(1.0 / max(1, w.speed))
+            started = loop.time()
+            await asyncio.to_thread(tick_site, site_id)
+            await asyncio.sleep(max(0.0, 1.0 / max(1, w.speed) - (loop.time() - started)))
         else:
             await asyncio.sleep(0.1)
 
@@ -148,9 +153,9 @@ def list_sites():
 # ---- per-site endpoints -----------------------------------------------------------------------
 @both("get", "/state")
 def state(site_id: str = DEFAULT):
+    """Served from the snapshot taken at the end of the last tick, so polling never waits on the sim."""
     w = world(site_id)
-    with db.lock:
-        return db.get_state(site_id, w.sim_time(), w.running, w.speed)
+    return {**STATE["snapshots"][site_id], "running": w.running, "speed": w.speed}
 
 
 @both("get", "/events")
@@ -193,6 +198,7 @@ def block_edge(body: BlockEdge, site_id: str = DEFAULT):
     with db.lock:
         w.set_edge_blocked(body.edge_id, True, body.minutes)
         w.persist()
+        refresh(site_id)
     return {"ok": True}
 
 
@@ -203,6 +209,7 @@ def freeze_robot(body: RobotRef, site_id: str = DEFAULT):
     with db.lock:
         w.freeze_robot(body.robot_id)
         w.persist()
+        refresh(site_id)
     return {"ok": True}
 
 
@@ -213,6 +220,7 @@ def drain_battery(body: RobotRef, site_id: str = DEFAULT):
     with db.lock:
         w.drain_battery(body.robot_id)
         w.persist()
+        refresh(site_id)
     return {"ok": True}
 
 
@@ -223,6 +231,7 @@ def bin_report(bin_id: str, body: BinReport, site_id: str = DEFAULT):
     with db.lock:
         w.report_bin(bin_id, body.fill_pct)
         w.persist()
+        refresh(site_id)
     return {"ok": True}
 
 
