@@ -1,7 +1,8 @@
 """Seed data for the UCSD campus site.
 
-IMPORTANT: the coordinates below are approximate. Open Google Maps, right-click
-each spot, copy its latitude and longitude, and paste over the numbers here.
+Coordinates: Geisel Library and Price Center come from published sources; the rest
+are estimated from map labels (within roughly 25 m). Good enough for the demo.
+To refine one, right-click the spot in Google Maps and paste its numbers here.
 """
 from math import asin, cos, radians, sin, sqrt
 
@@ -9,35 +10,38 @@ SITE = {"id": "ucsd", "name": "UCSD campus", "center_lat": 32.8801, "center_lng"
 
 # (id, display name, lat, lng)
 NODES = [
-    ("price_center", "Price Center", 32.8797, -117.2362),
-    ("geisel", "Geisel Library", 32.8811, -117.2376),
-    ("library_walk", "Library Walk", 32.8804, -117.2369),
-    ("warren_mall", "Warren Mall", 32.8826, -117.2341),
-    ("jacobs_hall", "Jacobs Hall", 32.8817, -117.2352),
-    ("student_services", "Student Services", 32.8786, -117.2370),
-    ("bookstore", "Bookstore", 32.8790, -117.2354),
-    ("peterson_hall", "Peterson Hall", 32.8800, -117.2395),
-    ("center_hall", "Center Hall", 32.8785, -117.2342),
-    ("york_hall", "York Hall", 32.8760, -117.2352),
-    ("sun_god", "Sun God Lawn", 32.8832, -117.2393),
-    ("eucalyptus_grove", "Eucalyptus Grove", 32.8787, -117.2403),
+    ("price_center", "Price Center", 32.8799, -117.2370),
+    ("geisel", "Geisel Library", 32.8811, -117.2375),
+    ("library_walk", "Library Walk", 32.8802, -117.2374),
+    ("jacobs_hall", "Jacobs Hall", 32.8818, -117.2351),
+    ("warren_mall", "Warren Mall", 32.8811, -117.2348),
+    ("atkinson_hall", "Atkinson Hall", 32.8825, -117.2347),
+    ("warren_lecture", "Warren Lecture Hall", 32.8805, -117.2344),
+    ("serf", "Engineering Research Facility", 32.8798, -117.2350),
+    ("matthews_quad", "Matthews Quad", 32.8791, -117.2353),
+    ("conrad_prebys", "Conrad Prebys Music Center", 32.8782, -117.2347),
+    ("student_health", "Student Health Services", 32.8792, -117.2380),
+    ("career_services", "Career Services Center", 32.8785, -117.2378),
+    ("sun_god_lawn", "Sun God Lawn", 32.8787, -117.2401),
 ]
 
 # pairs of node ids that connect by walkway; length is computed below
 EDGE_PAIRS = [
-    ("price_center", "library_walk"),
-    ("library_walk", "geisel"),
-    ("price_center", "bookstore"),
-    ("price_center", "student_services"),
-    ("library_walk", "jacobs_hall"),
-    ("jacobs_hall", "warren_mall"),
-    ("bookstore", "center_hall"),
-    ("bookstore", "jacobs_hall"),
-    ("center_hall", "york_hall"),
-    ("geisel", "sun_god"),
-    ("geisel", "peterson_hall"),
-    ("peterson_hall", "eucalyptus_grove"),
-    ("student_services", "eucalyptus_grove"),
+    ("geisel", "library_walk"),
+    ("library_walk", "price_center"),
+    ("library_walk", "student_health"),
+    ("student_health", "career_services"),
+    ("student_health", "sun_god_lawn"),
+    ("price_center", "matthews_quad"),
+    ("price_center", "serf"),
+    ("price_center", "warren_lecture"),
+    ("matthews_quad", "serf"),
+    ("matthews_quad", "conrad_prebys"),
+    ("serf", "warren_mall"),
+    ("warren_mall", "warren_lecture"),
+    ("warren_mall", "jacobs_hall"),
+    ("jacobs_hall", "atkinson_hall"),
+    ("geisel", "jacobs_hall"),
 ]
 
 # (bin id, node id, capacity in liters, starting fill %, fill rate in % per hour)
@@ -48,9 +52,9 @@ BINS = [
     ("b4", "library_walk", 240, 30, 7),
     ("b5", "warren_mall", 240, 10, 5),
     ("b6", "jacobs_hall", 240, 18, 4),
-    ("b7", "bookstore", 240, 22, 6),
-    ("b8", "center_hall", 240, 12, 4),
-    ("b9", "sun_god", 240, 8, 3),
+    ("b7", "matthews_quad", 240, 22, 6),
+    ("b8", "serf", 240, 12, 4),
+    ("b9", "sun_god_lawn", 240, 8, 3),
 ]
 
 # (dock id, node id, slots)
