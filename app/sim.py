@@ -126,9 +126,9 @@ class World:
         """(dock_node_id, distance_m) of the closest reachable dock, or None."""
         best = None
         for d in self.docks:
-            p = nav.shortest_path(self.graph, node_id, d["node_id"])
-            if p and (best is None or p[1] < best[1]):
-                best = (d["node_id"], p[1])
+            dist = nav.distance(self.graph, node_id, d["node_id"])
+            if dist is not None and (best is None or dist < best[1]):
+                best = (d["node_id"], dist)
         return best
 
     def log(self, kind, message, robot_id=None, bin_id=None):

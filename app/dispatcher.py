@@ -1,4 +1,6 @@
 """Task creation and robot assignment. Version 1 = greedy (the fallback)."""
+import inspect
+
 from . import navigation as nav, optimize
 
 PICKUP_THRESHOLD = 80.0  # bin becomes needs_pickup at this fill level
@@ -7,6 +9,7 @@ PLAN_EVERY_MIN = 5         # batch window for optimizer plans
 URGENT_FILL_PCT = 95.0     # plan immediately if a waiting bin is this full
 EXTRA_BIN_PCT = 60.0       # bins this full and near a pickup ride along on the same trip
 EXTRA_BIN_RADIUS_M = 300.0
+BALANCE_WEIGHT = 1000      # spread bins across robots instead of chaining them on one (tuned in headless sweeps)
 GREEDY_AFTER_MIN = 2 * PLAN_EVERY_MIN  # a task the planner can't place this long gets the greedy treatment
 
 
@@ -49,7 +52,8 @@ def plan_with_optimizer(w):
     nodes = sorted({x["start"] for x in robots} | {x["end"] for x in robots} | {s["node"] for s in stops})
     travel = nav.travel_matrix(w.graph, nodes, w.SPEED_M_PER_MIN)
     try:
-        result = optimize.plan_routes(nodes, travel, robots, stops, time_limit_s=w.plan_time_limit_s)
+        extra = {"balance_weight": BALANCE_WEIGHT} if "balance_weight" in inspect.signature(optimize.plan_routes).parameters else {}
+        result = optimize.plan_routes(nodes, travel, robots, stops, time_limit_s=w.plan_time_limit_s, **extra)
         routes = {rid: list(bins) for rid, bins in result["routes"].items() if bins}
     except Exception as exc:  # a broken solver must never stop the fleet
         w.log("planner_error", f"Route planner failed ({type(exc).__name__}); using greedy dispatch")
@@ -72,7 +76,7 @@ def _candidate_stops(w, open_tasks):
     for b in w.bins:
         if b["id"] in seen or b["fill_pct"] < EXTRA_BIN_PCT or w.has_open_task(b["id"]):
             continue
-        if any((nav.shortest_path(w.graph, a, b["node_id"]) or (None, 1e9))[1] <= EXTRA_BIN_RADIUS_M for a in anchors):
+        if any((nav.distance(w.graph, a, b["node_id"]) or 1e9) <= EXTRA_BIN_RADIUS_M for a in anchors):
             stops.append({"bin_id": b["id"], "node": b["node_id"], "demand": w.bin_demand_pct(b)})
     return stops
 

@@ -16,6 +16,7 @@ def build_graph(nodes, edges):
 
 def set_blocked(g, u, v, blocked):
     g[u][v]["blocked"] = blocked
+    g.graph.pop("dist_cache", None)  # distances change when a walkway opens or closes
 
 
 def _open_view(g):
@@ -33,6 +34,14 @@ def shortest_path(g, src, dst):
     return path, path_length(g, path)
 
 
+def distance(g, src, dst):
+    """Walking distance in metres over unblocked edges, or None. Cached until an edge changes."""
+    cache = g.graph.setdefault("dist_cache", {})
+    if src not in cache:
+        cache[src] = nx.single_source_dijkstra_path_length(_open_view(g), src, weight="length")
+    return cache[src].get(dst)
+
+
 def path_length(g, path):
     return sum(g[a][b]["length"] for a, b in zip(path, path[1:]))
 
@@ -44,6 +53,5 @@ def path_blocked(g, path):
 
 def travel_matrix(g, node_ids, speed_m_per_min):
     """Minutes between every pair of node_ids, in the order given (for optimize.plan_routes)."""
-    lengths = dict(nx.all_pairs_dijkstra_path_length(_open_view(g), weight="length"))
-    return [[(lengths[a][b] / speed_m_per_min) if b in lengths.get(a, {}) else NO_ROUTE_MIN
+    return [[(d / speed_m_per_min) if (d := distance(g, a, b)) is not None else NO_ROUTE_MIN
              for b in node_ids] for a in node_ids]

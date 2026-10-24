@@ -30,6 +30,21 @@ def new_world(site_id):
     return w
 
 
+SWEEP_SEEDS = int(os.environ.get("SWEEP_SEEDS", "5"))   # simulated days per fleet size
+SWEEP_REQUIRED_SHARE = 0.8                               # recommend the smallest fleet that meets the target on this share of days
+
+
+def _sweep(site):
+    """Multi-seed fleet-sizing study, shaped into Contract 1 `fleet_sizing` rows (extra fields ride along)."""
+    run = lambda n, seed: run_headless(n, seed, site=site)
+    study = optimize.fleet_size_study(run, seeds=range(SWEEP_SEEDS), required_share=SWEEP_REQUIRED_SHARE)
+    rows = [{"robots": r["robots"], "avg_wait_min": round(r["avg_wait_min"], 1),
+             "max_wait_min": round(r["max_wait_p95"], 1), "overflow_minutes": round(r["overflow_minutes"], 1),
+             "avg_wait_ci95": round(r["avg_wait_ci95"], 1), "share_meeting_target": round(r["share_meeting_target"], 2),
+             "n_seeds": r["n_seeds"]} for r in study["results"]]
+    return {"results": rows, "recommended": study["recommended"]}
+
+
 async def run_sweep(site_id):
     """Headless fleet-sizing sweep in a worker thread so live sims keep ticking."""
     if site_id in STATE["sweeping"]:
@@ -37,7 +52,7 @@ async def run_sweep(site_id):
     STATE["sweeping"].add(site_id)
     try:
         site = sites.get(site_id)
-        result = await asyncio.to_thread(optimize.fleet_size_sweep, lambda n, seed: run_headless(n, seed, site=site))
+        result = await asyncio.to_thread(_sweep, site)
         STATE["sweeps"][site_id] = result
         with db.lock:
             db.set_meta(site_id, "fleet_sizing", result["results"])
