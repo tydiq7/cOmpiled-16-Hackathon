@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>(function(){var t=new URLSearchParams(location.search).get("theme");try{t=t||localStorage.getItem("theme")}catch(e){}document.documentElement.dataset.theme=t==="light"?"light":"dark"})()</script>
 <title>Campus Waste Fleet</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -79,6 +80,26 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
 .problems.none h4{background:var(--ok)}
 .problems button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:#fff;padding:6px 12px;font:inherit;cursor:pointer;color:var(--ink)}
 .problems button:hover{background:#fdeeeb}.problems small{display:block;padding:5px 12px;color:var(--mute);border-top:1px solid var(--line)}
+header select{width:auto;font-weight:600;max-width:240px}
+/* ---- dark theme ---- */
+:root[data-theme=dark]{--bg:#0f1519;--card:#182128;--ink:#e6edf0;--mute:#93a4ad;--line:#2a3640;--brand:#17907e;--ok:#3ec27a;--warn:#f3b43a;--bad:#ff6a55;--blue:#6aa4ff;color-scheme:dark}
+[data-theme=dark] .btn,[data-theme=dark] .seg button,[data-theme=dark] select{background:var(--card);color:var(--ink)}
+[data-theme=dark] .btn.primary{background:var(--brand);color:#fff}
+[data-theme=dark] .seg button.on{background:var(--ink);color:var(--bg)}
+[data-theme=dark] .btn.danger{color:var(--bad);border-color:#5a2d28}[data-theme=dark] .btn.danger:hover{background:#3a1f1b}
+[data-theme=dark] .legend,[data-theme=dark] .problems,[data-theme=dark] .problems button{background:var(--card);color:var(--ink)}
+[data-theme=dark] .problems button:hover{background:#3a1f1b}
+[data-theme=dark] .nlabel{background:rgba(24,33,40,.92);color:var(--ink)}
+[data-theme=dark] #feed li.alert{background:#3a1f1b}
+[data-theme=dark] .rcard:hover{background:#22303a}
+[data-theme=dark] .chip{background:#173a35;color:#58d6bf}[data-theme=dark] .chip.sample{background:#3d3118;color:#f3c35a}[data-theme=dark] .chip.paused{background:#222d34;color:var(--mute)}
+[data-theme=dark] #toast{background:#2c3a44;border:1px solid var(--line)}[data-theme=dark] #toast.bad{background:var(--bad);color:#1a0b08}
+[data-theme=dark] .rb:not(.bad):not(.off){background:#2c3a44;border:1px solid #4a5b66}
+[data-theme=dark] .leaflet-container,[data-theme=dark] #map{background:#0b1013}
+[data-theme=dark] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.92) contrast(.92) saturate(.75)}
+[data-theme=dark] .leaflet-bar a{background:var(--card);color:var(--ink);border-color:var(--line)}
+[data-theme=dark] .leaflet-control-attribution{background:rgba(24,33,40,.85)!important;color:var(--mute)}[data-theme=dark] .leaflet-control-attribution a{color:var(--blue)}
+[data-theme=dark] #chart text[fill="#17232b"]{fill:var(--ink)}[data-theme=dark] #chart text[fill="#5d6f78"]{fill:var(--mute)}[data-theme=dark] #chart rect[fill="#c5ced2"]{fill:#3a4a53}
 @media(max-width:900px){body{display:block;height:auto}#map{height:55vh}aside{overflow:visible}#toast{left:50%}}
 @media(prefers-reduced-motion:reduce){.bin .bd.over,.blocked-path,.wb,.rring{animation:none}}
 </style>
@@ -86,7 +107,8 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
 <body>
 <div id="toast" role="alert"></div>
 <header>
-  <div class="brand"><h1>Campus Waste Fleet</h1><small>Robots empty the bins before they overflow</small></div>
+  <div class="brand"><h1 id="title">Waste Fleet</h1><small>Robots empty the bins before they overflow</small></div>
+  <select id="site" aria-label="Venue"></select>
   <div id="clock">--:--</div>
   <span id="chip" class="chip"><i></i><span>Loading</span></span>
   <div class="sp"></div>
@@ -94,6 +116,7 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
   <button class="btn" id="b-pause">Pause</button>
   <button class="btn" id="b-reset">Reset</button>
   <div class="seg" id="speeds" role="group" aria-label="Simulation speed"></div>
+  <button class="btn" id="b-theme" aria-label="Switch between dark and light mode"></button>
   <div id="day"></div>
 </header>
 <div id="map"></div>
@@ -134,6 +157,9 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
 <script>
 const API = "http://localhost:8000";   // the lead's FastAPI server
 const POLL_MS = 500, TARGET_MIN = 15;
+// Which venue is on screen: ?site=airport in the address, else the last choice, else the campus.
+let SITE = new URLSearchParams(location.search).get("site") || (() => { try { return localStorage.getItem("site"); } catch (e) { return null; } })() || "ucsd";
+const url = p => API + "/sites/" + encodeURIComponent(SITE) + p;
 const STATE_TEXT = {IDLE:"Waiting",EN_ROUTE:"Heading to a bin",COLLECTING:"Emptying a bin",RETURNING:"Returning to dock",UNLOADING:"Unloading",CHARGING:"Charging",STUCK:"Stuck",ESCALATED:"Needs a human"};
 const STATE_COLOR = {STUCK:"#e04b36",ESCALATED:"#e04b36",CHARGING:"#2d6fd6",IDLE:"#5d6f78"};
 const SPEEDS = [["Slow",5],["Demo",12],["Fast",30],["Turbo",100]];
@@ -176,12 +202,12 @@ function sync(group, items, make, update) {
 }
 
 async function getState() {
-  try { const r = await fetch(API + "/state"); if (!r.ok) throw 0; usingSample = false; return await r.json(); }
+  try { const r = await fetch(url("/state")); if (!r.ok) throw 0; usingSample = false; return await r.json(); }
   catch (e) { usingSample = true; return await (await fetch("sample_state.json")).json(); }
 }
 async function post(path, body) {
   if (usingSample) return toast("Start the backend server to use the controls. You are viewing sample data.");
-  try { await fetch(API + path, {method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined}); }
+  try { await fetch(url(path), {method:"POST", headers:{"Content-Type":"application/json"}, body: body ? JSON.stringify(body) : undefined}); }
   catch (e) { toast("Could not reach the server.", true); }
 }
 
@@ -258,6 +284,7 @@ function problemsPanel(s) {
 }
 
 function header(s) {
+  if (s.site) { $("title").textContent = "Waste Fleet \u00b7 " + s.site.name; document.title = "Waste Fleet \u00b7 " + s.site.name; }
   const t = new Date(s.sim_time), ok = !isNaN(t);
   $("clock").textContent = ok ? t.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : "--:--";
   $("day").style.width = ok ? ((t.getHours() * 60 + t.getMinutes()) / 1440 * 100) + "%" : "0";
@@ -274,7 +301,7 @@ function numbers(s) {
   $("k-needed").textContent = ok.length ? Math.min(...ok.map(f => f.robots)) : "—";
   $("k-over").textContent = k.overflow_minutes ?? "—"; $("k-wait").textContent = k.avg_wait_min ?? "—"; $("k-dist").textContent = k.distance_per_pickup_m ?? "—";
   const c = [0, 0, 0, 0]; s.bins.forEach(b => c[level(b)]++);
-  $("count").textContent = `${s.bins.length} bins across ${s.nodes.length} buildings`;
+  $("count").textContent = `${s.bins.length} bins across ${s.nodes.length} locations`;
   const names = ["Under 60%", "Filling up", "Needs pickup", "Overflowing"], colors = ["#2fa05a", "#f0a81c", "#e04b36", "#a8281a"];
   $("stack").innerHTML = c.map((n, i) => `<i style="width:${n / Math.max(1, s.bins.length) * 100}%;background:${colors[i]}"></i>`).join("");
   $("key").innerHTML = c.map((n, i) => `<span style="--c:${colors[i]}"><b>${n}</b> ${names[i]}</span>`).join("");
@@ -336,6 +363,30 @@ $("b-block").onclick = () => post("/faults/block_edge", {edge_id: $("f-edge").va
 $("b-freeze").onclick = () => post("/faults/freeze_robot", {robot_id: $("f-r1").value});
 $("b-drain").onclick = () => post("/faults/drain_battery", {robot_id: $("f-r2").value});
 $("b-signal").onclick = () => post("/faults/drop_signal", {robot_id: $("f-r3").value, minutes: 15});
+
+// ---- venue switcher: reload the whole picture for the chosen site ----
+function switchSite(id) {
+  SITE = id; try { localStorage.setItem("site", id); } catch (e) {}
+  history.replaceState(null, "", "?site=" + encodeURIComponent(id));
+  for (const g of Object.values(layers)) for (const k in g) { map.removeLayer(g[k]); delete g[k]; }
+  fitted = false; lastEventId = 0; firstLoad = true; state = null; byId = {};
+  $("feed").innerHTML = '<li class="empty">Nothing yet. Press Start to begin the day.</li>';
+  ["f-edge", "f-r1", "f-r2", "f-r3"].forEach(i => delete $(i).dataset.key);
+}
+fetch(API + "/sites").then(r => r.json()).then(list => {
+  $("site").innerHTML = list.map(v => `<option value="${esc(v.id)}">${esc(v.name)}</option>`).join("");
+  if (!list.some(v => v.id === SITE)) SITE = list[0].id;
+  $("site").value = SITE;
+}).catch(() => { $("site").style.display = "none"; });
+$("site").onchange = e => switchSite(e.target.value);
+
+// ---- dark / light mode (dark by default, remembered) ----
+function setTheme(t) {
+  document.documentElement.dataset.theme = t; try { localStorage.setItem("theme", t); } catch (e) {}
+  $("b-theme").textContent = t === "dark" ? "\u2600 Light" : "\u263e Dark";
+}
+$("b-theme").onclick = () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+setTheme(document.documentElement.dataset.theme || "dark");
 
 (async function tick() { try { render(await getState()); } catch (e) { console.error(e); } setTimeout(tick, POLL_MS); })();
 </script>
