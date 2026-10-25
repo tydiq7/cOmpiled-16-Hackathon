@@ -1,13 +1,13 @@
 """Runs the demo for you: starts the day and triggers each event on a timeline while you screen-record
 the dashboard and narrate. Plain Python, no installs. The server must already be running.
 
-    python tools/demo_conductor.py            # 8 second countdown, then the ~3.5 minute demo
+    python tools/demo_conductor.py            # 8 second countdown, then a 1:56 demo
     python tools/demo_conductor.py --delay 15 # longer countdown
     python tools/demo_conductor.py --fast     # 4x faster, just to check it works (do not record this)
 
 It prints a cue line for every beat, so you can read it next to the voiceover script (DEMO_SCRIPT.md).
-Two things it cannot do for you in the browser: scroll the sidebar down to the fleet-sizing chart, and
-pick the airport in the venue dropdown. Both are marked "YOU:" in the cues.
+Two things it cannot do for you in the browser: show the fleet-sizing chart (zoom the page to 80% so it fits,
+or scroll the sidebar) and pick the airport in the venue dropdown. Both are marked "YOU:" in the cues.
 """
 import argparse
 import json
@@ -107,52 +107,49 @@ def main():
     print(" " * 30)
 
     clock = Clock(scale)
-    cue(clock, "BEAT 1  THE PROBLEM. Dashboard sits paused at 8 AM. (hold ~20 s)")
-    clock.sleep(20)
 
-    cue(clock, "BEAT 2  START THE DAY. Bins turn from green to yellow; robots leave only when needed.")
+    def until(mark):
+        """Sleep until `mark` seconds into the demo (a fixed timeline keeps the video under 2 minutes)."""
+        remaining = mark * scale - clock.now()
+        if remaining > 0:
+            time.sleep(remaining)
+
+    cue(clock, "BEAT 1  THE PROBLEM  (0:00-0:22)  Dashboard sits paused at 8 AM. Explain the problem.")
+    until(22)
+
+    cue(clock, "BEAT 2  START THE DAY + LUNCH RUSH  (0:22-0:44)  Bins turn yellow; robots leave only when needed.")
+    post("/sim/speed", {"ticks_per_sec": 12})
     post("/sim/start")
-    wait_until_sim(clock, 11.75, max_real=40)
+    until(44)
 
-    cue(clock, "BEAT 3  LUNCH RUSH. Multi-stop routes; point at the event feed.")
-    wait_until_sim(clock, 12.75, max_real=25)
-
-    cue(clock, "BEAT 4  FAILURE 1: CROWD blocks a walkway. Watch the red CROWD badge and the reroute.")
-    post("/sim/speed", {"ticks_per_sec": 4})
-    s, r = wait_for_busy_robot(clock)
-    edge = edge_near(s, r["node_id"])
-    post("/faults/block_edge", {"edge_id": edge["id"], "minutes": 90})
-    cue(clock, f"        blocked {edge['id']} near robot {r['id']}")
-    clock.sleep(22)
-
-    cue(clock, "BEAT 5  FAILURE 2: A ROBOT GETS STUCK. Stuck, then NEEDS A HUMAN; its bin is reassigned; alert fires.")
+    cue(clock, "BEAT 3  FAILURE 1: CROWD  (0:44-1:00)  Red CROWD badge on the map, then the reroute.")
     post("/sim/speed", {"ticks_per_sec": 6})
-    s, r2 = wait_for_busy_robot(clock, skip=(r["id"],))
+    s, r = wait_for_busy_robot(clock, max_real=8)
+    edge = edge_near(s, r["node_id"])
+    post("/faults/block_edge", {"edge_id": edge["id"], "minutes": 120})
+    cue(clock, f"        blocked {edge['id']} near robot {r['id']}")
+    until(60)
+
+    cue(clock, "BEAT 4  FAILURE 2: STUCK ROBOT  (1:00-1:16)  STUCK, then NEEDS A HUMAN; bin reassigned; alert.")
+    s, r2 = wait_for_busy_robot(clock, skip=(r["id"],), max_real=8)
     post("/faults/freeze_robot", {"robot_id": r2["id"]})
     cue(clock, f"        froze robot {r2['id']}")
-    clock.sleep(24)
+    until(76)
 
-    cue(clock, "BEAT 6  BONUS: A ROBOT LOSES ITS CONNECTION. It keeps working offline, then catches up.")
-    post("/sim/speed", {"ticks_per_sec": 2})
-    s, r3 = wait_for_busy_robot(clock, skip=(r["id"], r2["id"]))
-    post("/faults/drop_signal", {"robot_id": r3["id"], "minutes": 40})
-    cue(clock, f"        cut signal to robot {r3['id']} (reconnects by itself in ~20 s)")
-    clock.sleep(30)
-
-    cue(clock, "BEAT 7  END OF DAY. Fast-forwarding to 8 PM.")
-    post("/sim/speed", {"ticks_per_sec": 100})
-    wait_until_sim(clock, 19.9, max_real=25)
+    cue(clock, "BEAT 5  THE ANSWER  (1:16-1:26)  YOU: show the fleet-sizing chart (zoom 80% so it fits, else scroll the sidebar).")
     post("/sim/pause")
-    cue(clock, "        YOU: scroll the right sidebar down to the fleet-sizing chart now. (hold ~15 s)")
-    clock.sleep(18)
+    until(86)
 
-    cue(clock, "BEAT 8  SCALE: SECOND VENUE. YOU: pick 'San Diego Airport' in the venue dropdown now.")
+    cue(clock, "BEAT 6  SCALE  (1:26-1:38)  YOU: pick 'San Diego Airport' in the venue dropdown now.")
     post("/sites/airport/sim/speed", {"ticks_per_sec": 12})
     post("/sites/airport/sim/start")
-    clock.sleep(22)
+    until(98)
     post("/sites/airport/sim/pause")
 
-    cue(clock, "DONE. Stop the recording. (Vision slide / outro is yours to narrate.)")
+    cue(clock, "BEAT 7  IMPACT + VISION  (1:38-1:56)  Nothing moves. Explain the impact and what is simulated vs. real.")
+    until(116)
+
+    cue(clock, "DONE. Stop the recording now (total about 1:56).")
 
 
 if __name__ == "__main__":

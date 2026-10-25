@@ -1,25 +1,33 @@
-# Demo recording: voiceover script
+# Demo recording: 2-minute voiceover script
 
-How to record (about 3.5 minutes):
+Total length: about 1:56. About 22 s for the problem, about 18 s for impact and vision, and about 75 s of live demo in between.
 
-1. Server running (`start.bat` or `python -m uvicorn app.main:app --port 8000`). Wait until the fleet-sizing chart has data (about 5 minutes after the server starts).
-2. Open `http://localhost:8000/` in Edge, full screen, dark mode, campus venue. Zoom to about 110%.
+## How to record
+
+1. Server running (`start.bat` or `python -m uvicorn app.main:app --port 8000`), and the fleet-sizing chart already filled in (about 5 minutes after the server starts).
+2. Open `http://localhost:8000/` in Edge, full screen, dark mode, campus venue. Set browser zoom to **80%** (Ctrl and minus) so the chart in the sidebar fits without scrolling. If it is still cut off, scroll the sidebar at beat 5.
 3. Start the recording with `Win+Alt+R`.
-4. In a terminal: `python tools/demo_conductor.py`. It counts down 8 seconds, then runs every beat below by itself. It prints a cue line at the start of each beat.
-5. Narrate while it runs. Stop the recording with `Win+Alt+R` when it prints DONE.
+4. In a terminal, from the repo root: `python tools/demo_conductor.py`. It counts down 8 seconds, then runs every event by itself and prints a cue line at the start of each beat.
+5. Narrate while it runs. Stop the recording when it prints DONE.
 
-Times are approximate (a few seconds of drift is normal, since some beats wait for the sim clock). Read the lines in quotes.
+Times are fixed marks, so the video stays under 2 minutes. The lines below are written to fit each beat at a normal speaking pace (about 150 words per minute).
 
-| Approx. time | On screen | Voiceover |
+## Voiceover
+
+| Time | On screen | Say |
 |---|---|---|
-| **0:00** BEAT 1 (about 20 s) | Dashboard paused at 8:00 AM. Bins green. | "Campus bins overflow at lunch, while crews empty half-full bins on a fixed schedule. Nobody should have to open an app to fix that. This is our software brain for a fleet of autonomous trash robots. Everything you'll see is a live simulation of UCSD, and a full day runs in about two minutes." |
-| **0:20** BEAT 2 (about 25 s) | The day starts. The clock runs; bins go green to yellow; robots leave their docks one at a time. | "We press start at 8 AM. Bins report how full they are. Notice the robots don't patrol. They stay docked until a bin actually needs emptying." |
-| **0:45** BEAT 3 (about 10 s) | Around noon. More yellow and red bins near Price Center. The feed fills with "planned route…" lines. | "Lunch rush. Bins near Price Center fill fast. An optimizer plans multi-stop routes, so one robot clears several bins in a single trip. Every decision is written to the feed, so the system explains itself." *(point at the feed)* |
-| **0:55** BEAT 4 (about 25 s) | Slows down. A red pulsing "CROWD … blocked" badge appears on a walkway; its line turns red and animates. The feed says a robot rerouted. | "Failure one: a crowd blocks a walkway. It's flagged right on the map. The robot reroutes around it, and the feed says why. Nobody had to intervene." |
-| **1:20** BEAT 5 (about 25 s) | A robot is frozen. Its label goes red: "STUCK", then "NEEDS A HUMAN". A toast and a beep. The problems panel (top right) lists it. | "Failure two: a robot gets stuck. The supervisor notices it has made no progress, tries to recover it, then escalates. Its bin is handed to another robot, and a human is alerted. That alert is what would go out by text." *(Only say "a text goes out" if Twilio is configured. Otherwise say "an alert goes to a human".)* |
-| **1:50** BEAT 6 (about 30 s) | A robot turns purple: "SIGNAL LOST", with a dashed ring. Then it reconnects and the feed says "synced N offline actions". | "Bonus: a robot loses its connection. It doesn't stop. It finishes its assignment from offline instructions, and it never runs past a time limit, so it can't collide with a robot the server has reassigned. When it reconnects it catches up on what it missed." |
-| **2:20** BEAT 7 (about 45 s) | Fast-forward to 8 PM, paused. **You scroll the sidebar to the fleet-sizing chart.** | "At the end of the day, the question a customer cares about: how many robots do they need? We simulate full days with different fleet sizes. The answer here is seven robots. That's the smallest fleet that keeps 95% of bins emptied within 15 minutes of filling up. Fewer than that and waits climb." |
-| **3:05** BEAT 8 (about 25 s) | **You pick "San Diego Airport" in the dropdown.** A different map, 40 bins, 6 robots, running. | "And this isn't just a campus system. Here's the same backend running an airport terminal: its own map, its own bins and robots, its own busy hours. Every venue is isolated, so a new site is just a new map and a list of bins. For this airport the answer is four robots." |
-| **3:30** Outro | Back to the campus, or your vision slide. | "Today everything is simulated. In the real world, cameras and lidar replace the crowd sensing, GPS and SLAM replace the map graph, and fill sensors replace the simulated bins. Robots self-unload at docks. We're a fleet-software company first." |
+| **0:00-0:22** The problem | Dashboard paused at 8:00 AM. Bins green. | "Campus bins overflow at lunch, while crews empty half-full ones on a fixed schedule. That means litter, smells, and wasted trips. Nobody should have to open an app to fix it. This is the software brain for a fleet of autonomous trash robots, shown here as a live simulation of UCSD." |
+| **0:22-0:44** Day starts, lunch rush | Clock runs; bins go yellow; robots leave docks; "planned route..." lines in the feed. | "A full day runs in about two minutes. Bins report how full they are, and robots stay docked until one needs emptying. At lunch, an optimizer plans multi-stop routes, so one robot clears several bins per trip. Every decision shows up in the feed." *(point at the feed)* |
+| **0:44-1:00** Failure 1: crowd | Red pulsing "CROWD ... blocked" badge on a walkway; the feed says a robot rerouted. | "Failure one: a crowd blocks a walkway. It's flagged on the map, the robot reroutes, and the feed says why." |
+| **1:00-1:16** Failure 2: stuck robot | A robot goes red: "STUCK", then "NEEDS A HUMAN". Toast and beep; the problems panel lists it. | "Failure two: a robot gets stuck. The supervisor retries, then escalates. Its bin goes to another robot and a human is alerted. The system knows when it's stuck." |
+| **1:16-1:26** The answer | Sidebar chart: fleet size vs. wait. | "The question a customer cares about: how many robots? Seven keeps 95 percent of bins emptied within fifteen minutes." |
+| **1:26-1:38** Scale | **You pick "San Diego Airport"** in the dropdown. A different map, 40 bins, 6 robots. | "And the same engine runs an airport, with its own map, bins, and busy hours. There, four robots is enough." |
+| **1:38-1:56** Impact + vision | Nothing moves (stay on the airport, or switch back to campus). | "We believe this means cleaner venues, fewer wasted trips, and staff freed up for the real exceptions. Today everything is simulated; in the real world, cameras, GPS and fill sensors replace each piece. Robots self-unload at docks. We're a fleet-software company first." |
 
-Do not describe how the docks work. Say only "robots self-unload at docks".
+## Notes
+
+- Do not describe how the docks work. Say only "robots self-unload at docks".
+- Only say "a text goes out" if Twilio is set up. It is not on the demo machine, so the line says "a human is alerted".
+- The chart numbers (7 campus, 4 airport) come from the startup sweep. Check the chart shows the same before you record, since the sweep can shift by a robot between runs.
+- If you quote impact numbers (cost, emissions, litter), verify the source first. The lines above use "we believe" and no statistics.
+- The signal-loss demo (a robot goes offline and reconnects) did not fit in 2 minutes. Mention it in Q&A if asked: it keeps working offline on a time-limited assignment, then syncs.
