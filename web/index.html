@@ -61,8 +61,26 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
 .rb{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:6px;white-space:nowrap;background:var(--ink);color:#fff;border-radius:99px;padding:3px 10px 3px 4px;font-size:11px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.4)}
 .rb b{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--c)}
 .leaflet-marker-icon.robot{transition:transform .5s linear}
+/* problems shown on the map itself */
+.rb.bad{background:var(--bad)}.rb.off{background:#5b4a86}
+.rw{position:absolute;left:0;bottom:24px;transform:translateX(-50%);white-space:nowrap;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:700;color:#fff;background:var(--bad);box-shadow:0 2px 8px rgba(0,0,0,.45)}
+.rw:after{content:"";position:absolute;left:50%;top:100%;margin-left:-6px;border:6px solid transparent;border-top-color:var(--bad)}
+.rw.off{background:#5b4a86}.rw.off:after{border-top-color:#5b4a86}
+.rw.low{background:#b7791f}.rw.low:after{border-top-color:#b7791f}
+.rring{position:absolute;left:0;top:0;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;border:3px solid var(--bad);animation:ring 1.3s infinite;pointer-events:none}
+.rring.off{border-color:#7a64b8;border-style:dashed}
+@keyframes ring{0%{transform:scale(.6);opacity:.95}100%{transform:scale(1.6);opacity:0}}
+@keyframes blink{50%{opacity:.55}}
+.blocked-path{animation:march .8s linear infinite}
+@keyframes march{to{stroke-dashoffset:-14}}
+.wb{position:absolute;transform:translate(-50%,-50%);white-space:nowrap;background:var(--bad);color:#fff;font-weight:700;font-size:12px;padding:4px 11px;border-radius:99px;border:2px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,.45);animation:blink 1.3s infinite}
+.problems{background:#fff;border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-size:12px;width:280px;overflow:hidden}
+.problems h4{margin:0;padding:7px 12px;background:var(--bad);color:#fff;font-size:12px}
+.problems.none h4{background:var(--ok)}
+.problems button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:#fff;padding:6px 12px;font:inherit;cursor:pointer;color:var(--ink)}
+.problems button:hover{background:#fdeeeb}.problems small{display:block;padding:5px 12px;color:var(--mute);border-top:1px solid var(--line)}
 @media(max-width:900px){body{display:block;height:auto}#map{height:55vh}aside{overflow:visible}#toast{left:50%}}
-@media(prefers-reduced-motion:reduce){.bin .bd.over{animation:none}}
+@media(prefers-reduced-motion:reduce){.bin .bd.over,.blocked-path,.wb,.rring{animation:none}}
 </style>
 </head>
 <body>
@@ -122,19 +140,29 @@ const SPEEDS = [["Slow",5],["Demo",12],["Fast",30],["Turbo",100]];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const col = r => r.online === false ? "#8a7bb0" : r.state in STATE_COLOR ? STATE_COLOR[r.state] : "#0f6b5e";
+// What, if anything, is wrong with a robot? Drives the warning label on the map and the problems panel.
+const warn = r => r.online === false ? {t: "\u26a0 SIGNAL LOST", c: "off"}
+  : r.state === "ESCALATED" ? {t: "\u26a0 NEEDS A HUMAN", c: ""}
+  : r.state === "STUCK" ? {t: "\u26a0 STUCK", c: ""}
+  : (r.battery_pct < 20 && r.state !== "CHARGING") ? {t: "\ud83d\udd0b LOW BATTERY " + Math.round(r.battery_pct) + "%", c: "low"} : null;
 const level = b => b.status === "overflowing" || b.fill_pct >= 100 ? 3 : b.fill_pct >= 80 ? 2 : b.fill_pct >= 60 ? 1 : 0;
 const LCOL = ["#2fa05a","#f0a81c","#e04b36","#e04b36"];
 
 const map = L.map("map", {zoomSnap: .5}).setView([32.8805, -117.2358], 17);
-L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  {maxZoom: 20, attribution: "&copy; OpenStreetMap, &copy; CARTO"}).addTo(map);
+map.createPane("alerts").style.zIndex = 700;   // robots and their warnings draw above the building labels
+L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",   // CARTO's tiles now demand an API key (watermark)
+  {maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"}).addTo(map);
 map.on("zoomend", () => map.getContainer().classList.toggle("far", map.getZoom() < 16));
 const legend = L.control({position: "bottomleft"});
 legend.onAdd = () => { const d = L.DomUtil.create("div", "legend");
   d.innerHTML = `<span><i style="background:#2fa05a"></i>Bin under 60% full</span><span><i style="background:#f0a81c"></i>Filling up (60–80%)</span><span><i style="background:#e04b36"></i>Needs pickup (80%+)</span><span><em></em>Blocked walkway</span>`; return d; };
 legend.addTo(map);
+const problems = L.control({position: "topright"});
+problems.onAdd = () => { const d = L.DomUtil.create("div", "problems"); L.DomEvent.disableClickPropagation(d); problems._d = d;
+  d.onclick = e => { const b = e.target.closest("button"), p = b && d._items[b.dataset.i]; if (p && p.ll) map.flyTo(p.ll, 18); }; return d; };
+problems.addTo(map);
 
-const layers = {edges:{}, nodes:{}, bins:{}, robots:{}};
+const layers = {edges:{}, nodes:{}, bins:{}, robots:{}, warns:{}};
 const ringR = {};   // radius (m) of each building's ring of bins, so labels sit just outside it
 const mpp = () => 156543.03 * Math.cos(32.88 * Math.PI / 180) / Math.pow(2, map.getZoom());
 function bindLabel(l, id) { l.unbindTooltip(); l.bindTooltip(l._html || "", {permanent: true, direction: "bottom", className: "nlabel", offset: [0, 8 + (ringR[id] || 0) / mpp()]}); }
@@ -163,8 +191,16 @@ function render(s) {
 
   sync(layers.edges, s.edges.filter(e => byId[e.from] && byId[e.to]),
     e => L.polyline([[byId[e.from].lat, byId[e.from].lng], [byId[e.to].lat, byId[e.to].lng]]).bindTooltip(""),
-    (l, e) => { l.setStyle(e.blocked ? {color:"#e04b36", weight:6, dashArray:"7 7", opacity:.95} : {color:"#8da0a8", weight:3, dashArray:null, opacity:.8});
+    (l, e) => { l.getElement()?.classList.toggle("blocked-path", !!e.blocked); l.setStyle(e.blocked ? {color:"#e04b36", weight:6, dashArray:"7 7", opacity:.95} : {color:"#8da0a8", weight:3, dashArray:null, opacity:.8});
                 l.setTooltipContent(`${esc(byId[e.from].name)} to ${esc(byId[e.to].name)} · ${e.length_m} m${e.blocked ? " · BLOCKED" : ""}`); });
+
+  const crowds = s.edges.filter(e => e.blocked && byId[e.from] && byId[e.to]).map(e => ({id: e.id,
+    lat: (byId[e.from].lat + byId[e.to].lat) / 2, lng: (byId[e.from].lng + byId[e.to].lng) / 2,
+    name: `${byId[e.from].name} \u2013 ${byId[e.to].name}`}));
+  sync(layers.warns, crowds,
+    w => L.marker([w.lat, w.lng], {pane: "alerts", zIndexOffset: 900, interactive: false, icon: L.divIcon({className: "", html: "", iconSize: null})}),
+    (l, w) => { l.setLatLng([w.lat, w.lng]); const el = l.getElement(), h = `<div class="wb">\u26a0 CROWD \u00b7 ${esc(w.name)} blocked</div>`;
+                if (el && el._h !== h) { el.innerHTML = h; el._h = h; } });
 
   const items = [];   // bins sit in rings around their building (6 in the first ring, then 12, 18, ...)
   for (const id in groups) { const nd = byId[id]; if (!nd) continue; const arr = groups[id]; let k = 0, ring = 1;
@@ -190,13 +226,35 @@ function render(s) {
                 l.setTooltipContent(`Bin ${esc(b.id)} at ${esc((byId[b.node_id] || {}).name || b.node_id)}<br>${Math.round(b.fill_pct)}% full${lv === 3 ? " (overflowing)" : lv === 2 ? " (needs pickup)" : ""}`); });
 
   sync(layers.robots, s.robots,
-    r => L.marker([r.lat, r.lng], {zIndexOffset: 1000, icon: L.divIcon({className: "robot", html: "", iconSize: null})}),
+    r => L.marker([r.lat, r.lng], {pane: "alerts", zIndexOffset: 1000, icon: L.divIcon({className: "robot", html: "", iconSize: null})}),
     (l, r) => { l.setLatLng([r.lat, r.lng]); const el = l.getElement();
-                if (el) el.innerHTML = `<div class="rb" style="--c:${col(r)}"><b>${esc(r.id)}</b>${STATE_TEXT[r.state] || esc(r.state)}</div>`; });
+                const w = warn(r), off = r.online === false, bad = r.state === "STUCK" || r.state === "ESCALATED",
+                      what = STATE_TEXT[r.state] || esc(r.state),
+                      h = (w && w.c !== "low" ? `<div class="rring ${w.c}"></div>` : "") + (w ? `<div class="rw ${w.c}">${w.t}</div>` : "") +
+                          `<div class="rb${off ? " off" : bad ? " bad" : ""}" style="--c:${col(r)}"><b>${esc(r.id)}</b>${off ? "Offline \u00b7 last seen: " + what.toLowerCase() : what}</div>`;
+                if (el && el._h !== h) { el.innerHTML = h; el._h = h; } });
+
+  problemsPanel(s);
 
   if (!fitted && s.nodes.length) { map.fitBounds(s.nodes.map(n => [n.lat, n.lng]), {padding: [60, 60]}); fitted = true; }
 
   header(s); numbers(s); robotList(s); controls(s); events(s.events || []); chart(s.fleet_sizing || []);
+}
+
+function problemsPanel(s) {
+  const d = problems._d; if (!d) return;
+  const list = [];
+  s.edges.filter(e => e.blocked && byId[e.from] && byId[e.to]).forEach(e => list.push({
+    txt: `Crowd blocking ${byId[e.from].name} \u2013 ${byId[e.to].name}`,
+    ll: [(byId[e.from].lat + byId[e.to].lat) / 2, (byId[e.from].lng + byId[e.to].lng) / 2]}));
+  s.robots.forEach(r => { const w = warn(r); if (w) list.push({txt: `Robot ${r.id}: ${w.t.replace(/^\S+\s/, "").toLowerCase()}`, ll: [r.lat, r.lng]}); });
+  const over = s.bins.filter(b => level(b) === 3).length;
+  if (over) list.push({txt: `${over} bin${over > 1 ? "s" : ""} overflowing`, ll: null});
+  d._items = list;
+  const h = `<h4>${list.length ? "\u26a0 " + list.length + " active problem" + (list.length > 1 ? "s" : "") : "\u2713 All systems normal"}</h4>` +
+    list.slice(0, 6).map((p, i) => `<button data-i="${i}">${esc(p.txt)}</button>`).join("") +
+    (list.length > 6 ? `<small>+ ${list.length - 6} more</small>` : "");
+  if (d._h !== h) { d.innerHTML = h; d._h = h; d.className = "problems" + (list.length ? "" : " none"); }
 }
 
 function header(s) {
