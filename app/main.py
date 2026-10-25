@@ -120,6 +120,11 @@ class RobotRef(BaseModel):
     robot_id: str
 
 
+class DropSignal(BaseModel):
+    robot_id: str
+    minutes: int = 15
+
+
 class BinReport(BaseModel):
     fill_pct: float
 
@@ -219,6 +224,28 @@ def drain_battery(body: RobotRef, site_id: str = DEFAULT):
     _lookup(w.robot_by_id, body.robot_id, "robot")
     with db.lock:
         w.drain_battery(body.robot_id)
+        w.persist()
+        refresh(site_id)
+    return {"ok": True}
+
+
+@both("post", "/faults/drop_signal")
+def drop_signal(body: DropSignal, site_id: str = DEFAULT):
+    w = world(site_id)
+    _lookup(w.robot_by_id, body.robot_id, "robot")
+    with db.lock:
+        w.drop_signal(body.robot_id, body.minutes)
+        w.persist()
+        refresh(site_id)
+    return {"ok": True}
+
+
+@both("post", "/faults/restore_signal")
+def restore_signal(body: RobotRef, site_id: str = DEFAULT):
+    w = world(site_id)
+    _lookup(w.robot_by_id, body.robot_id, "robot")
+    with db.lock:
+        w.restore_signal(body.robot_id)
         w.persist()
         refresh(site_id)
     return {"ok": True}

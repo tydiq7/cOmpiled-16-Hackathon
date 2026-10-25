@@ -33,15 +33,16 @@ def plan_with_optimizer(w):
     """Version 2: hand every idle robot a multi-stop route. Returns False if the optimizer was
     not used or gave nothing (caller falls back to greedy), True if planning ran."""
     open_tasks = [t for t in w.tasks if t["status"] == "open"]
-    idle = [r for r in w.robots if r["state"] == "IDLE" and not r["frozen"] and not r["route"]
+    idle = [r for r in w.robots if r["state"] == "IDLE" and not r["frozen"] and not r["route"] and r["online"]
             and r["battery"] > w.LOW_BATTERY_PCT]
     if not open_tasks or not idle:
         return True  # nothing to do is not a failure
     if w.t - w.__dict__.get("last_plan_t", -10**9) < MIN_PLAN_GAP_MIN:
         return True
     urgent = any(w.bin_by_id[t["bin_id"]]["fill_pct"] >= URGENT_FILL_PCT for t in open_tasks)
-    if not urgent and w.t % PLAN_EVERY_MIN != 0:
-        return True  # wait for the batch window
+    plentiful = len(idle) >= len(open_tasks)  # batching only pays off when robots are scarce
+    if not urgent and not plentiful and w.t % PLAN_EVERY_MIN != 0:
+        return True  # robots are scarce: wait for the batch window so one robot can take several bins
     w.last_plan_t = w.t
     stops = _candidate_stops(w, open_tasks)[:MAX_PLAN_STOPS]
     robots = []
@@ -94,6 +95,7 @@ def _assign_route(w, robot, bin_ids):
         task = next((t for t in w.tasks if t["bin_id"] == bid and t["status"] == "open"), None)
         if task is None:  # a ride-along bin that wasn't over the pickup threshold yet
             task = w.new_task(b)
+            task["ride_along"] = True  # not overdue yet, so it doesn't count toward wait-time metrics
         parts.append(f"{bid} ({b['fill_pct']:.0f}%)")
         w.assign(task, robot, bin_ids)
     w.log("dispatch", f"Robot {robot['id']} planned route: {' -> '.join(parts)}"
@@ -120,7 +122,7 @@ def assign_greedy(w, min_age=0):
         demand = w.bin_demand_pct(b)
         best = None
         for r in w.robots:
-            if r["state"] != "IDLE" or r["frozen"] or r["route"]:
+            if r["state"] != "IDLE" or r["frozen"] or r["route"] or not r["online"]:
                 continue
             to_bin = nav.shortest_path(w.graph, r["node"], b["node_id"])
             if to_bin is None:

@@ -25,7 +25,7 @@ CREATE TABLE docks (site_id TEXT, id TEXT, node_id TEXT, slots INTEGER, PRIMARY 
 CREATE TABLE robots (
     site_id TEXT, id TEXT, current_node_id TEXT, state TEXT DEFAULT 'IDLE',
     battery_pct REAL DEFAULT 100, load_pct REAL DEFAULT 0, task_id INTEGER, last_progress_at TEXT,
-    lat REAL, lng REAL, route_json TEXT DEFAULT '[]', PRIMARY KEY (site_id, id));
+    lat REAL, lng REAL, route_json TEXT DEFAULT '[]', online INTEGER DEFAULT 1, PRIMARY KEY (site_id, id));
 CREATE TABLE tasks (
     site_id TEXT, id INTEGER, bin_id TEXT, robot_id TEXT, created_at TEXT,
     assigned_at TEXT, completed_at TEXT, status TEXT DEFAULT 'open', attempts INTEGER DEFAULT 0,
@@ -131,7 +131,8 @@ def get_state(site_id, sim_time, running, speed):
     for r in rows("SELECT * FROM robots WHERE site_id=? ORDER BY id"):
         robots.append({"id": r["id"], "lat": r["lat"], "lng": r["lng"], "node_id": r["current_node_id"],
                        "state": r["state"], "battery_pct": round(r["battery_pct"], 1),
-                       "load_pct": round(r["load_pct"], 1), "route": json.loads(r["route_json"] or "[]")})
+                       "load_pct": round(r["load_pct"], 1), "route": json.loads(r["route_json"] or "[]"),
+                       "online": bool(r["online"])})
     last_id = c.execute("SELECT MAX(id) FROM events WHERE site_id=?", (site_id,)).fetchone()[0] or 0
     s = sites.get(site_id)
     return {

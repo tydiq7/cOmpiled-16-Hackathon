@@ -96,6 +96,7 @@ select{font:inherit;padding:7px 8px;border:1px solid var(--line);border-radius:8
     <div class="frow"><label for="f-edge">A crowd blocks a walkway<small>Robots reroute around it for 30 minutes</small></label><select id="f-edge"></select><button class="btn danger" id="b-block">Block it</button></div>
     <div class="frow"><label for="f-r1">A robot gets stuck<small>The system reassigns its job and alerts a person</small></label><select id="f-r1"></select><button class="btn danger" id="b-freeze">Freeze it</button></div>
     <div class="frow"><label for="f-r2">A battery drains fast<small>The robot heads back to charge</small></label><select id="f-r2"></select><button class="btn danger" id="b-drain">Drain it</button></div>
+    <div class="frow"><label for="f-r3">A robot loses its connection<small>It keeps working offline, then catches up when it reconnects</small></label><select id="f-r3"></select><button class="btn danger" id="b-signal">Cut signal</button></div>
   </section>
 
   <section class="card">
@@ -120,7 +121,7 @@ const STATE_COLOR = {STUCK:"#e04b36",ESCALATED:"#e04b36",CHARGING:"#2d6fd6",IDLE
 const SPEEDS = [["Slow",5],["Demo",12],["Fast",30],["Turbo",100]];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const col = r => r.state in STATE_COLOR ? STATE_COLOR[r.state] : "#0f6b5e";
+const col = r => r.online === false ? "#8a7bb0" : r.state in STATE_COLOR ? STATE_COLOR[r.state] : "#0f6b5e";
 const level = b => b.status === "overflowing" || b.fill_pct >= 100 ? 3 : b.fill_pct >= 80 ? 2 : b.fill_pct >= 60 ? 1 : 0;
 const LCOL = ["#2fa05a","#f0a81c","#e04b36","#e04b36"];
 
@@ -224,7 +225,7 @@ function numbers(s) {
 function robotList(s) {
   const bar = (v, c) => `<span class="bar"><i style="width:${Math.max(0, Math.min(100, v))}%;background:${c}"></i></span>`;
   $("robots").innerHTML = s.robots.map(r => `<button class="rcard" data-id="${esc(r.id)}"><span class="av" style="background:${col(r)}">${esc(r.id)}</span>
-    <b>${STATE_TEXT[r.state] || esc(r.state)}</b><small>Battery ${Math.round(r.battery_pct)}% · Load ${Math.round(r.load_pct)}%</small>
+    <b>${r.online === false ? "Offline (last seen: " + (STATE_TEXT[r.state] || esc(r.state)).toLowerCase() + ")" : STATE_TEXT[r.state] || esc(r.state)}</b><small>Battery ${Math.round(r.battery_pct)}% · Load ${Math.round(r.load_pct)}%</small>
     ${bar(r.battery_pct, r.battery_pct < 25 ? "#e04b36" : "#2fa05a")}</button>`).join("");
 }
 $("robots").onclick = e => { const b = e.target.closest(".rcard"); const r = state && state.robots.find(x => x.id === b?.dataset.id); if (r) map.flyTo([r.lat, r.lng], 18); };
@@ -236,13 +237,13 @@ function fill(sel, opts) {
 }
 function controls(s) {
   fill($("f-edge"), s.edges.map(e => [e.id, `${(byId[e.from] || {}).name || e.from} to ${(byId[e.to] || {}).name || e.to}`]));
-  const ro = s.robots.map(r => [r.id, `Robot ${r.id}`]); fill($("f-r1"), ro); fill($("f-r2"), ro);
+  const ro = s.robots.map(r => [r.id, `Robot ${r.id}`]); fill($("f-r1"), ro); fill($("f-r2"), ro); fill($("f-r3"), ro);
 }
 
 function events(list) {
   for (const e of list.filter(e => e.id > lastEventId).sort((a, b) => a.id - b.id)) {
     const li = document.createElement("li"), t = new Date(e.sim_time), small = document.createElement("small");
-    const kind = /alert|escalat/.test(e.kind) ? "alert" : /reroute/.test(e.kind) ? "reroute" : /fault/.test(e.kind) ? "fault" : "";
+    const kind = /alert|escalat/.test(e.kind) ? "alert" : /reroute/.test(e.kind) ? "reroute" : /fault|signal_lost/.test(e.kind) ? "fault" : "";
     li.className = kind; small.textContent = isNaN(t) ? "" : t.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"});
     li.append(document.createTextNode(e.message), small);
     if (kind === "alert" && !firstLoad) { toast(e.message, true); beep(); }
@@ -276,6 +277,7 @@ $("b-reset").onclick = () => { lastEventId = 0; $("feed").innerHTML = '<li class
 $("b-block").onclick = () => post("/faults/block_edge", {edge_id: $("f-edge").value, minutes: 30});
 $("b-freeze").onclick = () => post("/faults/freeze_robot", {robot_id: $("f-r1").value});
 $("b-drain").onclick = () => post("/faults/drain_battery", {robot_id: $("f-r2").value});
+$("b-signal").onclick = () => post("/faults/drop_signal", {robot_id: $("f-r3").value, minutes: 15});
 
 (async function tick() { try { render(await getState()); } catch (e) { console.error(e); } setTimeout(tick, POLL_MS); })();
 </script>

@@ -38,6 +38,9 @@ class World:
     LOW_BATTERY_PCT = 25.0
     COLLECT_MIN = 2
     UNLOAD_MIN = 3
+    LEASE_MIN = 25               # a robot's assignment stays valid this long after its last contact with the server
+    SERVER_GRACE_MIN = COLLECT_MIN + 1   # the server waits this much longer before reassigning, so a pickup in progress finishes
+    ROBOT_SIDE_KINDS = ("collected", "unload", "reroute", "no_route", "offline_abort")  # logged on the robot while offline
 
     def __init__(self, site=None, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
         self.site = site or sites.get(sites.DEFAULT_SITE_ID)
@@ -87,6 +90,8 @@ class World:
         self.pickups = 0
         self.energy_pct = 0.0         # total battery % consumed by the fleet
         self.dispatch_paused = False  # set by the over-budget detector
+        self.offline_aborts = 0       # times a robot stood down on its own after losing contact
+        self.conflicts = 0            # pickups made by a robot that did not hold that bin's assignment (should stay 0)
 
     # ---- construction helpers -------------------------------------------------------------
     def _new_robot(self, r):
@@ -95,7 +100,9 @@ class World:
                 "lat": n["lat"], "lng": n["lng"], "route": [], "path": [], "seg": None,
                 "task_id": None, "timer": 0, "frozen": False, "waiting": False,
                 "drain_mult": 1.0, "drain_until": None, "last_progress": 0, "target": None,
-                "visits": [], "prev_state": None, "stuck_since": None}
+                "visits": [], "prev_state": None, "stuck_since": None,
+                "online": True, "offline_until": None, "offline_since": None, "lease_until": 0, "lease_handled": False,
+                "offline_log": [], "seen": None}
 
     def new_task(self, b):
         self._task_id += 1
@@ -132,11 +139,18 @@ class World:
         return best
 
     def log(self, kind, message, robot_id=None, bin_id=None):
+        r = self.robot_by_id.get(robot_id) if robot_id else None
+        if r is not None and not r["online"] and kind in self.ROBOT_SIDE_KINDS:
+            r["offline_log"].append((self.sim_time(), kind, message, bin_id))  # the server only hears this on reconnect
+            return
+        self._emit(self.sim_time(), kind, message, robot_id, bin_id)
+
+    def _emit(self, sim_time, kind, message, robot_id=None, bin_id=None):
         if self.live:
-            db.add_event(self.site_id, self.sim_time(), kind, message, robot_id=robot_id, bin_id=bin_id)
+            db.add_event(self.site_id, sim_time, kind, message, robot_id=robot_id, bin_id=bin_id)
         else:
             self._event_id += 1
-            self.events.append({"id": self._event_id, "sim_time": self.sim_time(), "kind": kind,
+            self.events.append({"id": self._event_id, "sim_time": sim_time, "kind": kind,
                                 "message": message, "robot_id": robot_id, "bin_id": bin_id})
 
     # ---- dispatcher hooks -----------------------------------------------------------------
@@ -270,6 +284,9 @@ class World:
         r["battery"] = max(0.0, r["battery"] - idle)
         if r["frozen"]:
             return
+        if (not r["online"] and r["route"] and self.t >= r["lease_until"]
+                and r["state"] in ("EN_ROUTE", "IDLE")):
+            self._offline_abort(r)  # offline instructions: assignment lease ran out, stand down
         st = r["state"]
         if st == "IDLE":
             if r["route"]:
@@ -315,20 +332,82 @@ class World:
         task = next((t for t in self.tasks if t["bin_id"] == b["id"] and t["status"] == "assigned"), None)
         if task:
             task["status"], task["completed"] = "done", self.t
-            self.waits.append(self.t - task["created"])
+            if not task.get("ride_along"):
+                self.waits.append(self.t - task["created"])
             self.pickups += 1
+        if task is None or task["robot_id"] != r["id"]:
+            self.conflicts += 1
         was = b["fill_pct"]
         b["fill_pct"], b["last_emptied"] = 0.0, self.t
         self._refresh_bin_status(b)
         self.log("collected", f"Robot {r['id']} emptied bin {b['id']} at {self.node_name(b['node_id'])} "
                               f"({was:.0f}% full)", robot_id=r["id"], bin_id=b["id"])
         r["task_id"] = None
+        if r["route"] and not r["online"] and self.t >= r["lease_until"]:
+            self._offline_abort(r)  # lease over while collecting: do not start another stop
+            return
         if r["route"]:
             if self._begin_path(r, self.bin_by_id[r["route"][0]]["node_id"]):
                 r["state"] = "EN_ROUTE"
                 return
         dock = self.nearest_dock(r["node"])
         if dock and self._begin_path(r, dock[0]):
+            r["state"] = "RETURNING"
+        else:
+            r["state"] = "IDLE"
+
+    # ---- connection loss ------------------------------------------------------------------
+    def _view(self, r):
+        """What the server last heard from this robot (frozen at the moment contact is lost)."""
+        v = {k: r[k] for k in ("node", "state", "battery", "load", "lat", "lng", "last_progress", "task_id")}
+        v["route"] = list(r["route"])
+        return v
+
+    def drop_signal(self, robot_id, minutes=15):
+        """Fault: the robot loses its connection for `minutes` sim-minutes. It keeps running its offline
+        instructions: finish the assigned stops, but never past its lease, then go to a dock and wait."""
+        r = self.robot_by_id[robot_id]
+        if not r["online"]:
+            return
+        r["seen"] = self._view(r)
+        r["online"], r["offline_since"], r["offline_until"] = False, self.t, self.t + minutes
+        until = self.sim_time(r["lease_until"])[11:16]
+        self.log("signal_lost", f"Lost contact with robot {robot_id} near {self.node_name(r['node'])}. It keeps "
+                                f"working from its offline instructions until {until}, then returns to dock",
+                 robot_id=robot_id)
+
+    def restore_signal(self, robot_id):
+        """The robot reconnects: replay what it did offline, then catch it up to the server's current plan."""
+        r = self.robot_by_id[robot_id]
+        if r["online"]:
+            return
+        r["online"], r["offline_until"], r["lease_handled"], r["seen"] = True, None, False, None
+        r["lease_until"] = self.t + self.LEASE_MIN
+        buffered, r["offline_log"] = r["offline_log"], []
+        for ts, kind, msg, bid in buffered:
+            self._emit(ts, kind, msg + " (synced after reconnect)", robot_id, bid)
+        keep = [bid for bid in r["route"] if any(t["bin_id"] == bid and t["robot_id"] == robot_id
+                                                 and t["status"] == "assigned" for t in self.tasks)]
+        dropped = [bid for bid in r["route"] if bid not in keep]
+        if dropped:  # reassigned while it was away: stand down
+            r["route"] = keep
+            if r["state"] == "EN_ROUTE":
+                if not (keep and self._begin_path(r, self.bin_by_id[keep[0]]["node_id"])):
+                    dock = self.nearest_dock(r["node"])
+                    r["state"] = "RETURNING" if dock and self.begin_path_from(r, dock[0]) else "IDLE"
+        msg = f"Robot {robot_id} back online after {self.t - r['offline_since']} min: synced {len(buffered)} offline actions"
+        if dropped:
+            msg += f"; dropped stops {', '.join(dropped)} (reassigned meanwhile)"
+        self._emit(self.sim_time(), "signal_restored", msg, robot_id)
+
+    def _offline_abort(self, r):
+        """Offline instructions: the assignment lease ran out, so drop the remaining stops and return to dock."""
+        dropped, r["route"], r["task_id"] = list(r["route"]), [], None
+        self.offline_aborts += 1
+        self.log("offline_abort", f"Robot {r['id']} lost contact and its lease ran out: dropped stops "
+                                  f"{', '.join(dropped)} and is returning to dock", robot_id=r["id"])
+        dock = self.nearest_dock(r["node"])
+        if dock and self.begin_path_from(r, dock[0]):
             r["state"] = "RETURNING"
         else:
             r["state"] = "IDLE"
@@ -356,6 +435,11 @@ class World:
             if b["fill_pct"] >= 100:
                 self.overflow_minutes += 1
             self._refresh_bin_status(b)
+        for r in self.robots:
+            if not r["online"] and r["offline_until"] is not None and self.t >= r["offline_until"]:
+                self.restore_signal(r["id"])
+            elif r["online"]:
+                r["lease_until"] = self.t + self.LEASE_MIN  # heartbeat: the server renews the assignment lease
         dispatcher.step(self)
         for r in self.robots:
             self._step_robot(r)
@@ -401,7 +485,8 @@ class World:
 
     def final_waits(self):
         """Waits of finished pickups plus the running wait of tasks still open (so a tiny fleet can't hide)."""
-        pending = [self.t - t["created"] for t in self.tasks if t["status"] in ("open", "assigned", "escalated")]
+        pending = [self.t - t["created"] for t in self.tasks
+                   if t["status"] in ("open", "assigned", "escalated") and not t.get("ride_along")]
         return self.waits + pending
 
     # ---- persistence ----------------------------------------------------------------------
@@ -414,9 +499,10 @@ class World:
                            for b in self.bins])
             c.executemany(
                 "UPDATE robots SET current_node_id=?, state=?, battery_pct=?, load_pct=?, task_id=?,"
-                " last_progress_at=?, lat=?, lng=?, route_json=? WHERE site_id=? AND id=?",
-                [(r["node"], r["state"], r["battery"], r["load"], r["task_id"], self.sim_time(r["last_progress"]),
-                  r["lat"], r["lng"], json.dumps(r["route"]), sid, r["id"]) for r in self.robots])
+                " last_progress_at=?, lat=?, lng=?, route_json=?, online=? WHERE site_id=? AND id=?",
+                [(v["node"], v["state"], v["battery"], v["load"], v["task_id"], self.sim_time(v["last_progress"]),
+                  v["lat"], v["lng"], json.dumps(v["route"]), int(r["online"]), sid, r["id"])
+                 for r in self.robots for v in [r if r["online"] else r["seen"]]])
             c.executemany("UPDATE edges SET blocked=?, blocked_until=? WHERE site_id=? AND id=?",
                           [(int(e["blocked"]), e["blocked_until"] and self.sim_time(e["blocked_until"]), sid, e["id"])
                            for e in self.edges])

@@ -10,6 +10,11 @@ the module to MODULES. Nothing else in the backend changes.
          or {"id","node_id","capacity_l","fill_rate_pct_per_hr"[,"start_fill_pct"]}
   DOCKS  (id, node_id, slots)                 or dict
   ROBOTS (id, node_id)                        or dict
+
+Optional per-venue tuning, all read with getattr so a seed file can leave them out:
+  fill_multiplier(hour)  or  HOURLY_CURVE (24 numbers)   -> the venue's busy hours
+  SWEEP_SIZES            -> fleet sizes the fleet-sizing sweep tries first (default 2..8)
+  SWEEP_MAX              -> if none of those meets the target, keep trying up to this many robots
 """
 import math
 from dataclasses import dataclass
@@ -39,10 +44,20 @@ class Site:
     docks: list
     robots: list
     fill_multiplier: object = None  # optional hour -> multiplier; None means the default curve
+    sweep_sizes: tuple = tuple(range(2, 9))
+    sweep_max: int = None
 
 
 def _row(row, keys):
     return dict(row) if isinstance(row, dict) else dict(zip(keys, row))
+
+
+def _curve(mod):
+    """The venue's busy-hours function: its own fill_multiplier, else its HOURLY_CURVE table, else None."""
+    if getattr(mod, "fill_multiplier", None):
+        return mod.fill_multiplier
+    curve = getattr(mod, "HOURLY_CURVE", None)
+    return (lambda hour: curve[int(hour) % 24]) if curve else None
 
 
 def load(mod):
@@ -63,7 +78,9 @@ def load(mod):
                 nodes=nodes, edges=edges, bins=bins,
                 docks=[_row(d, ("id", "node_id", "slots")) for d in mod.DOCKS],
                 robots=[_row(r, ("id", "node_id")) for r in mod.ROBOTS],
-                fill_multiplier=getattr(mod, "fill_multiplier", None))
+                fill_multiplier=_curve(mod),
+                sweep_sizes=tuple(getattr(mod, "SWEEP_SIZES", range(2, 9))),
+                sweep_max=getattr(mod, "SWEEP_MAX", None))
 
 
 SITES = {s.id: s for s in (load(m) for m in MODULES)}

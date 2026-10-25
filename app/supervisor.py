@@ -20,8 +20,10 @@ def step(w):
         if r["state"] == "ESCALATED":
             continue
         _check_battery(w, r)
-        _check_looping(w, r)
-        _check_stuck(w, r)
+        if r["online"]:  # the server cannot observe an offline robot's progress; the lease check covers it
+            _check_looping(w, r)
+            _check_stuck(w, r)
+    _check_leases(w)
     _check_budget(w)
     _check_overflow_risk(w)
 
@@ -61,6 +63,23 @@ def _escalate(w, r, reason):
     if bins:
         msg += f"; task for bin {', '.join(bins)} reassigned"
     notify.alert(w, msg + ". Needs a human.", robot_id=r["id"], bin_id=bins[0] if bins else None)
+
+
+# ---- connection loss -------------------------------------------------------------------------
+def _check_leases(w):
+    """Reassign an offline robot's bins only after its lease (plus a short grace) has run out. By then the
+    robot's own offline instructions have made it stand down, so two robots never go for the same bin."""
+    for r in w.robots:
+        if r["online"] or r["lease_handled"] or w.t < r["lease_until"] + w.SERVER_GRACE_MIN:
+            continue
+        r["lease_handled"] = True
+        mine = [t for t in w.tasks if t["robot_id"] == r["id"] and t["status"] == "assigned"]
+        for t in mine:
+            t["status"], t["robot_id"] = "open", None
+            w._refresh_bin_status(w.bin_by_id[t["bin_id"]])
+        text = f"Robot {r['id']} has been out of contact for {w.t - r['offline_since']} min"
+        text += f"; its {len(mine)} unfinished bins were reassigned." if mine else "."
+        notify.alert(w, text + " Needs a human.", robot_id=r["id"])
 
 
 # ---- looping ---------------------------------------------------------------------------------
@@ -148,7 +167,7 @@ def _check_overflow_risk(w):
 def _best_eta_min(w, b):
     best = None
     for r in w.robots:
-        if r["frozen"] or r["state"] in ("ESCALATED", "STUCK") or r["battery"] <= 0:
+        if r["frozen"] or r["state"] in ("ESCALATED", "STUCK") or r["battery"] <= 0 or not r["online"]:
             continue
         p = nav.shortest_path(w.graph, r["node"], b["node_id"])
         if p is None:

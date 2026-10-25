@@ -91,10 +91,18 @@ for _id, _name, _lat, _lng, _traffic, _count, _rate in BUILDINGS:
                      _rng.randint(5, 35), round(_rate * _rng.uniform(0.75, 1.25), 1)))
 
 # (dock id, node id, slots)
-DOCKS = [("d1", "geisel", 2), ("d2", "warren_mall", 2)]
+# Spread across campus so an idle robot is never far from a bin: a single dock on the west side
+# left the north-east corner about ten minutes away.
+DOCKS = [("d1", "geisel", 3), ("d2", "price_center", 3), ("d3", "warren_mall", 3),
+         ("d4", "brennan_hall", 3), ("d5", "trolley_station", 3)]
 
-# (robot id, starting node id)
-ROBOTS = [("r1", "geisel"), ("r2", "geisel"), ("r3", "warren_mall"), ("r4", "warren_mall")]
+# Fleet-sizing sweep: with ~200 bins a handful of robots cannot keep up, so try 12 to 15 robots first
+# and, if none meets the service target, keep going up to 20.
+SWEEP_SIZES = range(12, 16)
+SWEEP_MAX = 20
+
+# (robot id, starting node id): 14 robots spread over the docks
+ROBOTS = [(f"r{i + 1}", DOCKS[i % len(DOCKS)][1]) for i in range(14)]
 
 
 def _meters(a, b):
@@ -110,11 +118,6 @@ EDGES = [(f"e{i + 1}", a, b, _meters(_pos[a], _pos[b])) for i, (a, b) in enumera
 if __name__ == "__main__":
     print(f"{len(NODES)} nodes, {len(EDGES)} edges, {len(BINS)} bins, "
           f"{len(DOCKS)} docks, {len(ROBOTS)} robots")
-<<<<<<< HEAD
     for b in BUILDINGS:
         n = sum(1 for x in BINS if x[1] == b[0])
         print(f"  {b[1]:<38} traffic {b[4]}  bins {n}  base rate {b[6]}%/hr")
-=======
-    for e in EDGES:
-        print(e)
->>>>>>> 069c3982d6627cb81567c48fa1186fae14591e84
