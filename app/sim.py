@@ -5,6 +5,7 @@ World is the in-memory source of truth. In live mode it mirrors itself into SQLi
 skips the database entirely and runs as fast as Python allows.
 """
 import json
+import math
 import random
 from datetime import datetime, timedelta
 
@@ -522,6 +523,8 @@ def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True, s
     w = World(site=site, num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
     for _ in range(minutes):
         w.tick()
-    waits = w.final_waits() or [0]
-    return {"avg_wait_min": round(sum(waits) / len(waits), 1), "max_wait_min": float(max(waits)),
+    waits = sorted(w.final_waits() or [0])
+    p95 = waits[max(0, math.ceil(0.95 * len(waits)) - 1)]  # 95% of bins were emptied within this many minutes
+    return {"avg_wait_min": round(sum(waits) / len(waits), 1), "max_wait_min": float(waits[-1]),
+            "p95_wait_min": float(p95),
             "overflow_minutes": float(w.overflow_minutes), "distance_m": round(w.dist_driven_m)}

@@ -257,7 +257,7 @@ function chart(rows) {
   const svg = $("chart");
   if (!rows.length) { svg.innerHTML = ""; $("chart-note").textContent = "Run the fleet-size test to see the answer."; return; }
   const ok = rows.filter(r => r.max_wait_min <= TARGET_MIN), best = ok.length ? Math.min(...ok.map(r => r.robots)) : null;
-  $("chart-note").textContent = best ? `${best} robots is the smallest fleet that keeps every bin's wait under ${TARGET_MIN} minutes.` : `No fleet size in the test met the ${TARGET_MIN}-minute goal.`;
+  $("chart-note").textContent = best ? `${best} robots is the smallest fleet that keeps 95% of bins' waits under ${TARGET_MIN} minutes.` : `No fleet size in the test met the ${TARGET_MIN}-minute goal.`;
   const W = 340, H = 170, pl = 8, pb = 34, pt = 18, max = Math.max(TARGET_MIN * 1.6, ...rows.map(r => r.max_wait_min)), bw = (W - pl * 2) / rows.length;
   const y = v => H - pb - v / max * (H - pb - pt);
   let o = `<line x1="${pl}" x2="${W - pl}" y1="${y(TARGET_MIN)}" y2="${y(TARGET_MIN)}" stroke="#e04b36" stroke-dasharray="4 3"/><text x="${W - pl}" y="${y(TARGET_MIN) - 4}" text-anchor="end" font-size="10" fill="#e04b36">${TARGET_MIN} min goal</text>`;
@@ -265,7 +265,7 @@ function chart(rows) {
     o += `<rect x="${x}" y="${y(r.max_wait_min)}" width="${w}" height="${Math.max(1, H - pb - y(r.max_wait_min))}" rx="4" fill="${good ? "#0f6b5e" : "#c5ced2"}"/>
       <text x="${x + w / 2}" y="${y(r.max_wait_min) - 4}" text-anchor="middle" font-size="10" fill="#17232b">${Math.round(r.max_wait_min)}</text>
       <text x="${x + w / 2}" y="${H - pb + 14}" text-anchor="middle" font-size="11" font-weight="600" fill="#17232b">${r.robots}</text>`; });
-  svg.innerHTML = o + `<text x="${W / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#5d6f78">robots in the fleet (bar = longest wait in minutes)</text>`;
+  svg.innerHTML = o + `<text x="${W / 2}" y="${H - 4}" text-anchor="middle" font-size="10" fill="#5d6f78">robots in the fleet (bar = typical 95th-percentile wait, in minutes)</text>`;
 }
 
 let tt; function toast(msg, bad) { const t = $("toast"); t.textContent = msg; t.className = bad ? "bad" : ""; t.style.display = "block"; clearTimeout(tt); tt = setTimeout(() => t.style.display = "none", 7000); }
