@@ -1,3 +1,5 @@
 fleet.db
 __pycache__/
 *.pyc
+fleet.db-shm
+fleet.db-wal

@@ -1,0 +1,1755 @@
+{
+ "sim_time": "2026-10-24T12:15:00",
+ "running": true,
+ "speed": 20,
+ "nodes": [
+  {
+   "id": "price_center",
+   "name": "Price Center",
+   "lat": 32.8799,
+   "lng": -117.237
+  },
+  {
+   "id": "geisel",
+   "name": "Geisel Library",
+   "lat": 32.8811,
+   "lng": -117.2375
+  },
+  {
+   "id": "library_walk",
+   "name": "Library Walk",
+   "lat": 32.8802,
+   "lng": -117.2374
+  },
+  {
+   "id": "warren_mall",
+   "name": "Warren Mall",
+   "lat": 32.8811,
+   "lng": -117.2348
+  },
+  {
+   "id": "trolley_station",
+   "name": "Central Campus Trolley Station",
+   "lat": 32.8792,
+   "lng": -117.232
+  },
+  {
+   "id": "matthews_quad",
+   "name": "Matthews Quad",
+   "lat": 32.8791,
+   "lng": -117.2353
+  },
+  {
+   "id": "jacobs_hall",
+   "name": "Jacobs Hall",
+   "lat": 32.8818,
+   "lng": -117.2351
+  },
+  {
+   "id": "warren_lecture",
+   "name": "Warren Lecture Hall",
+   "lat": 32.8805,
+   "lng": -117.2344
+  },
+  {
+   "id": "sun_god_lawn",
+   "name": "Sun God Lawn",
+   "lat": 32.8787,
+   "lng": -117.2401
+  },
+  {
+   "id": "engineering_2",
+   "name": "Engineering Building II",
+   "lat": 32.8812,
+   "lng": -117.2339
+  },
+  {
+   "id": "cognitive_science",
+   "name": "Cognitive Science Building",
+   "lat": 32.8806,
+   "lng": -117.2393
+  },
+  {
+   "id": "student_health",
+   "name": "Student Health Services",
+   "lat": 32.8792,
+   "lng": -117.238
+  },
+  {
+   "id": "structural_materials",
+   "name": "Structural and Materials Engineering",
+   "lat": 32.8798,
+   "lng": -117.2331
+  },
+  {
+   "id": "brennan_hall",
+   "name": "Brennan Hall",
+   "lat": 32.8827,
+   "lng": -117.2326
+  },
+  {
+   "id": "social_sciences",
+   "name": "Social Sciences Research Building",
+   "lat": 32.8806,
+   "lng": -117.2401
+  },
+  {
+   "id": "douglas_hall",
+   "name": "Douglas Hall",
+   "lat": 32.8833,
+   "lng": -117.2333
+  },
+  {
+   "id": "brown_hall",
+   "name": "Brown Hall",
+   "lat": 32.8835,
+   "lng": -117.2323
+  },
+  {
+   "id": "black_hall",
+   "name": "Black Hall",
+   "lat": 32.8821,
+   "lng": -117.2328
+  },
+  {
+   "id": "atkinson_hall",
+   "name": "Atkinson Hall",
+   "lat": 32.8825,
+   "lng": -117.2347
+  },
+  {
+   "id": "serf",
+   "name": "Engineering Research Facility",
+   "lat": 32.8798,
+   "lng": -117.235
+  },
+  {
+   "id": "conrad_prebys",
+   "name": "Conrad Prebys Music Center",
+   "lat": 32.8782,
+   "lng": -117.2347
+  },
+  {
+   "id": "franklin_antonio",
+   "name": "Franklin Antonio Hall",
+   "lat": 32.8835,
+   "lng": -117.2349
+  },
+  {
+   "id": "canyonview",
+   "name": "Canyonview Aquatic Center",
+   "lat": 32.8806,
+   "lng": -117.2322
+  },
+  {
+   "id": "career_services",
+   "name": "Career Services Center",
+   "lat": 32.8785,
+   "lng": -117.2378
+  },
+  {
+   "id": "coalition",
+   "name": "Coalition",
+   "lat": 32.882,
+   "lng": -117.24
+  },
+  {
+   "id": "umoja",
+   "name": "Umoja",
+   "lat": 32.8825,
+   "lng": -117.2394
+  },
+  {
+   "id": "alianza",
+   "name": "Alianza",
+   "lat": 32.8831,
+   "lng": -117.2397
+  },
+  {
+   "id": "faculty_club",
+   "name": "Faculty Club",
+   "lat": 32.8793,
+   "lng": -117.2394
+  }
+ ],
+ "edges": [
+  {
+   "id": "e1",
+   "from": "geisel",
+   "to": "library_walk",
+   "length_m": 101,
+   "blocked": false
+  },
+  {
+   "id": "e2",
+   "from": "library_walk",
+   "to": "price_center",
+   "length_m": 50,
+   "blocked": true
+  },
+  {
+   "id": "e3",
+   "from": "library_walk",
+   "to": "student_health",
+   "length_m": 125,
+   "blocked": false
+  },
+  {
+   "id": "e4",
+   "from": "library_walk",
+   "to": "cognitive_science",
+   "length_m": 183,
+   "blocked": false
+  },
+  {
+   "id": "e5",
+   "from": "student_health",
+   "to": "career_services",
+   "length_m": 80,
+   "blocked": false
+  },
+  {
+   "id": "e6",
+   "from": "student_health",
+   "to": "sun_god_lawn",
+   "length_m": 204,
+   "blocked": false
+  },
+  {
+   "id": "e7",
+   "from": "cognitive_science",
+   "to": "faculty_club",
+   "length_m": 145,
+   "blocked": false
+  },
+  {
+   "id": "e8",
+   "from": "faculty_club",
+   "to": "sun_god_lawn",
+   "length_m": 93,
+   "blocked": false
+  },
+  {
+   "id": "e9",
+   "from": "cognitive_science",
+   "to": "social_sciences",
+   "length_m": 75,
+   "blocked": false
+  },
+  {
+   "id": "e10",
+   "from": "social_sciences",
+   "to": "coalition",
+   "length_m": 156,
+   "blocked": false
+  },
+  {
+   "id": "e11",
+   "from": "coalition",
+   "to": "umoja",
+   "length_m": 79,
+   "blocked": false
+  },
+  {
+   "id": "e12",
+   "from": "umoja",
+   "to": "alianza",
+   "length_m": 72,
+   "blocked": false
+  },
+  {
+   "id": "e13",
+   "from": "geisel",
+   "to": "umoja",
+   "length_m": 236,
+   "blocked": false
+  },
+  {
+   "id": "e14",
+   "from": "price_center",
+   "to": "matthews_quad",
+   "length_m": 182,
+   "blocked": false
+  },
+  {
+   "id": "e15",
+   "from": "price_center",
+   "to": "serf",
+   "length_m": 187,
+   "blocked": false
+  },
+  {
+   "id": "e16",
+   "from": "price_center",
+   "to": "warren_lecture",
+   "length_m": 252,
+   "blocked": false
+  },
+  {
+   "id": "e17",
+   "from": "matthews_quad",
+   "to": "serf",
+   "length_m": 83,
+   "blocked": false
+  },
+  {
+   "id": "e18",
+   "from": "matthews_quad",
+   "to": "conrad_prebys",
+   "length_m": 115,
+   "blocked": false
+  },
+  {
+   "id": "e19",
+   "from": "serf",
+   "to": "warren_mall",
+   "length_m": 146,
+   "blocked": false
+  },
+  {
+   "id": "e20",
+   "from": "serf",
+   "to": "structural_materials",
+   "length_m": 177,
+   "blocked": false
+  },
+  {
+   "id": "e21",
+   "from": "structural_materials",
+   "to": "trolley_station",
+   "length_m": 122,
+   "blocked": false
+  },
+  {
+   "id": "e22",
+   "from": "structural_materials",
+   "to": "canyonview",
+   "length_m": 122,
+   "blocked": false
+  },
+  {
+   "id": "e23",
+   "from": "canyonview",
+   "to": "engineering_2",
+   "length_m": 172,
+   "blocked": false
+  },
+  {
+   "id": "e24",
+   "from": "warren_mall",
+   "to": "warren_lecture",
+   "length_m": 76,
+   "blocked": false
+  },
+  {
+   "id": "e25",
+   "from": "warren_mall",
+   "to": "jacobs_hall",
+   "length_m": 83,
+   "blocked": false
+  },
+  {
+   "id": "e26",
+   "from": "warren_mall",
+   "to": "engineering_2",
+   "length_m": 85,
+   "blocked": false
+  },
+  {
+   "id": "e27",
+   "from": "engineering_2",
+   "to": "warren_lecture",
+   "length_m": 91,
+   "blocked": false
+  },
+  {
+   "id": "e28",
+   "from": "engineering_2",
+   "to": "black_hall",
+   "length_m": 143,
+   "blocked": false
+  },
+  {
+   "id": "e29",
+   "from": "black_hall",
+   "to": "brennan_hall",
+   "length_m": 69,
+   "blocked": false
+  },
+  {
+   "id": "e30",
+   "from": "brennan_hall",
+   "to": "douglas_hall",
+   "length_m": 93,
+   "blocked": false
+  },
+  {
+   "id": "e31",
+   "from": "douglas_hall",
+   "to": "brown_hall",
+   "length_m": 96,
+   "blocked": false
+  },
+  {
+   "id": "e32",
+   "from": "brown_hall",
+   "to": "brennan_hall",
+   "length_m": 93,
+   "blocked": false
+  },
+  {
+   "id": "e33",
+   "from": "douglas_hall",
+   "to": "franklin_antonio",
+   "length_m": 151,
+   "blocked": false
+  },
+  {
+   "id": "e34",
+   "from": "jacobs_hall",
+   "to": "atkinson_hall",
+   "length_m": 86,
+   "blocked": false
+  },
+  {
+   "id": "e35",
+   "from": "atkinson_hall",
+   "to": "franklin_antonio",
+   "length_m": 113,
+   "blocked": false
+  },
+  {
+   "id": "e36",
+   "from": "geisel",
+   "to": "jacobs_hall",
+   "length_m": 237,
+   "blocked": false
+  }
+ ],
+ "bins": [
+  {
+   "id": "b1",
+   "node_id": "price_center",
+   "fill_pct": 112,
+   "status": "overflowing"
+  },
+  {
+   "id": "b2",
+   "node_id": "price_center",
+   "fill_pct": 106.2,
+   "status": "overflowing"
+  },
+  {
+   "id": "b3",
+   "node_id": "price_center",
+   "fill_pct": 103.5,
+   "status": "overflowing"
+  },
+  {
+   "id": "b4",
+   "node_id": "price_center",
+   "fill_pct": 85.3,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b5",
+   "node_id": "price_center",
+   "fill_pct": 106.1,
+   "status": "overflowing"
+  },
+  {
+   "id": "b6",
+   "node_id": "price_center",
+   "fill_pct": 74.8,
+   "status": "ok"
+  },
+  {
+   "id": "b7",
+   "node_id": "price_center",
+   "fill_pct": 97.4,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b8",
+   "node_id": "price_center",
+   "fill_pct": 77.9,
+   "status": "ok"
+  },
+  {
+   "id": "b9",
+   "node_id": "price_center",
+   "fill_pct": 82.8,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b10",
+   "node_id": "price_center",
+   "fill_pct": 90.4,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b11",
+   "node_id": "price_center",
+   "fill_pct": 100.2,
+   "status": "overflowing"
+  },
+  {
+   "id": "b12",
+   "node_id": "price_center",
+   "fill_pct": 112,
+   "status": "overflowing"
+  },
+  {
+   "id": "b13",
+   "node_id": "price_center",
+   "fill_pct": 109.6,
+   "status": "overflowing"
+  },
+  {
+   "id": "b14",
+   "node_id": "price_center",
+   "fill_pct": 108.7,
+   "status": "overflowing"
+  },
+  {
+   "id": "b15",
+   "node_id": "price_center",
+   "fill_pct": 91.6,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b16",
+   "node_id": "price_center",
+   "fill_pct": 83.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b17",
+   "node_id": "price_center",
+   "fill_pct": 93.6,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b18",
+   "node_id": "price_center",
+   "fill_pct": 98.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b19",
+   "node_id": "price_center",
+   "fill_pct": 112,
+   "status": "overflowing"
+  },
+  {
+   "id": "b20",
+   "node_id": "price_center",
+   "fill_pct": 94.6,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b21",
+   "node_id": "price_center",
+   "fill_pct": 95.0,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b22",
+   "node_id": "price_center",
+   "fill_pct": 93.1,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b23",
+   "node_id": "price_center",
+   "fill_pct": 92.6,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b24",
+   "node_id": "price_center",
+   "fill_pct": 94.5,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b25",
+   "node_id": "price_center",
+   "fill_pct": 110.6,
+   "status": "overflowing"
+  },
+  {
+   "id": "b26",
+   "node_id": "price_center",
+   "fill_pct": 104.2,
+   "status": "overflowing"
+  },
+  {
+   "id": "b27",
+   "node_id": "geisel",
+   "fill_pct": 98.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b28",
+   "node_id": "geisel",
+   "fill_pct": 72.0,
+   "status": "ok"
+  },
+  {
+   "id": "b29",
+   "node_id": "geisel",
+   "fill_pct": 82.4,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b30",
+   "node_id": "geisel",
+   "fill_pct": 83.5,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b31",
+   "node_id": "geisel",
+   "fill_pct": 79.0,
+   "status": "ok"
+  },
+  {
+   "id": "b32",
+   "node_id": "geisel",
+   "fill_pct": 94.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b33",
+   "node_id": "geisel",
+   "fill_pct": 88.7,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b34",
+   "node_id": "geisel",
+   "fill_pct": 101.3,
+   "status": "overflowing"
+  },
+  {
+   "id": "b35",
+   "node_id": "geisel",
+   "fill_pct": 70.8,
+   "status": "ok"
+  },
+  {
+   "id": "b36",
+   "node_id": "geisel",
+   "fill_pct": 80.0,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b37",
+   "node_id": "geisel",
+   "fill_pct": 84.7,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b38",
+   "node_id": "geisel",
+   "fill_pct": 65.7,
+   "status": "ok"
+  },
+  {
+   "id": "b39",
+   "node_id": "geisel",
+   "fill_pct": 75.3,
+   "status": "ok"
+  },
+  {
+   "id": "b40",
+   "node_id": "geisel",
+   "fill_pct": 86.3,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b41",
+   "node_id": "geisel",
+   "fill_pct": 105.1,
+   "status": "overflowing"
+  },
+  {
+   "id": "b42",
+   "node_id": "geisel",
+   "fill_pct": 83.5,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b43",
+   "node_id": "geisel",
+   "fill_pct": 86.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b44",
+   "node_id": "geisel",
+   "fill_pct": 90.7,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b45",
+   "node_id": "geisel",
+   "fill_pct": 80.8,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b46",
+   "node_id": "geisel",
+   "fill_pct": 74.2,
+   "status": "ok"
+  },
+  {
+   "id": "b47",
+   "node_id": "library_walk",
+   "fill_pct": 66.5,
+   "status": "ok"
+  },
+  {
+   "id": "b48",
+   "node_id": "library_walk",
+   "fill_pct": 85.1,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b49",
+   "node_id": "library_walk",
+   "fill_pct": 79.0,
+   "status": "ok"
+  },
+  {
+   "id": "b50",
+   "node_id": "library_walk",
+   "fill_pct": 86.2,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b51",
+   "node_id": "library_walk",
+   "fill_pct": 71.6,
+   "status": "ok"
+  },
+  {
+   "id": "b52",
+   "node_id": "library_walk",
+   "fill_pct": 89.0,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b53",
+   "node_id": "library_walk",
+   "fill_pct": 68.3,
+   "status": "ok"
+  },
+  {
+   "id": "b54",
+   "node_id": "library_walk",
+   "fill_pct": 59.1,
+   "status": "ok"
+  },
+  {
+   "id": "b55",
+   "node_id": "library_walk",
+   "fill_pct": 59.9,
+   "status": "ok"
+  },
+  {
+   "id": "b56",
+   "node_id": "library_walk",
+   "fill_pct": 69.6,
+   "status": "ok"
+  },
+  {
+   "id": "b57",
+   "node_id": "library_walk",
+   "fill_pct": 67.1,
+   "status": "ok"
+  },
+  {
+   "id": "b58",
+   "node_id": "library_walk",
+   "fill_pct": 66.3,
+   "status": "ok"
+  },
+  {
+   "id": "b59",
+   "node_id": "warren_mall",
+   "fill_pct": 78.7,
+   "status": "ok"
+  },
+  {
+   "id": "b60",
+   "node_id": "warren_mall",
+   "fill_pct": 55.7,
+   "status": "ok"
+  },
+  {
+   "id": "b61",
+   "node_id": "warren_mall",
+   "fill_pct": 63.5,
+   "status": "ok"
+  },
+  {
+   "id": "b62",
+   "node_id": "warren_mall",
+   "fill_pct": 63.0,
+   "status": "ok"
+  },
+  {
+   "id": "b63",
+   "node_id": "warren_mall",
+   "fill_pct": 79.7,
+   "status": "ok"
+  },
+  {
+   "id": "b64",
+   "node_id": "warren_mall",
+   "fill_pct": 71.6,
+   "status": "ok"
+  },
+  {
+   "id": "b65",
+   "node_id": "warren_mall",
+   "fill_pct": 66.8,
+   "status": "ok"
+  },
+  {
+   "id": "b66",
+   "node_id": "warren_mall",
+   "fill_pct": 74.6,
+   "status": "ok"
+  },
+  {
+   "id": "b67",
+   "node_id": "warren_mall",
+   "fill_pct": 45.8,
+   "status": "ok"
+  },
+  {
+   "id": "b68",
+   "node_id": "warren_mall",
+   "fill_pct": 49.5,
+   "status": "ok"
+  },
+  {
+   "id": "b69",
+   "node_id": "warren_mall",
+   "fill_pct": 47.3,
+   "status": "ok"
+  },
+  {
+   "id": "b70",
+   "node_id": "warren_mall",
+   "fill_pct": 79.8,
+   "status": "ok"
+  },
+  {
+   "id": "b71",
+   "node_id": "trolley_station",
+   "fill_pct": 54.5,
+   "status": "ok"
+  },
+  {
+   "id": "b72",
+   "node_id": "trolley_station",
+   "fill_pct": 53.6,
+   "status": "ok"
+  },
+  {
+   "id": "b73",
+   "node_id": "trolley_station",
+   "fill_pct": 65.3,
+   "status": "ok"
+  },
+  {
+   "id": "b74",
+   "node_id": "trolley_station",
+   "fill_pct": 72.1,
+   "status": "ok"
+  },
+  {
+   "id": "b75",
+   "node_id": "trolley_station",
+   "fill_pct": 82.0,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b76",
+   "node_id": "trolley_station",
+   "fill_pct": 84.3,
+   "status": "needs_pickup"
+  },
+  {
+   "id": "b77",
+   "node_id": "trolley_station",
+   "fill_pct": 78.4,
+   "status": "ok"
+  },
+  {
+   "id": "b78",
+   "node_id": "trolley_station",
+   "fill_pct": 75.0,
+   "status": "ok"
+  },
+  {
+   "id": "b79",
+   "node_id": "matthews_quad",
+   "fill_pct": 73.6,
+   "status": "ok"
+  },
+  {
+   "id": "b80",
+   "node_id": "matthews_quad",
+   "fill_pct": 67.5,
+   "status": "ok"
+  },
+  {
+   "id": "b81",
+   "node_id": "matthews_quad",
+   "fill_pct": 51.2,
+   "status": "ok"
+  },
+  {
+   "id": "b82",
+   "node_id": "matthews_quad",
+   "fill_pct": 46.0,
+   "status": "ok"
+  },
+  {
+   "id": "b83",
+   "node_id": "matthews_quad",
+   "fill_pct": 59.8,
+   "status": "ok"
+  },
+  {
+   "id": "b84",
+   "node_id": "matthews_quad",
+   "fill_pct": 39.5,
+   "status": "ok"
+  },
+  {
+   "id": "b85",
+   "node_id": "matthews_quad",
+   "fill_pct": 46.3,
+   "status": "ok"
+  },
+  {
+   "id": "b86",
+   "node_id": "matthews_quad",
+   "fill_pct": 41.2,
+   "status": "ok"
+  },
+  {
+   "id": "b87",
+   "node_id": "jacobs_hall",
+   "fill_pct": 35.0,
+   "status": "ok"
+  },
+  {
+   "id": "b88",
+   "node_id": "jacobs_hall",
+   "fill_pct": 53.1,
+   "status": "ok"
+  },
+  {
+   "id": "b89",
+   "node_id": "jacobs_hall",
+   "fill_pct": 52.6,
+   "status": "ok"
+  },
+  {
+   "id": "b90",
+   "node_id": "jacobs_hall",
+   "fill_pct": 51.5,
+   "status": "ok"
+  },
+  {
+   "id": "b91",
+   "node_id": "jacobs_hall",
+   "fill_pct": 63.1,
+   "status": "ok"
+  },
+  {
+   "id": "b92",
+   "node_id": "jacobs_hall",
+   "fill_pct": 47.1,
+   "status": "ok"
+  },
+  {
+   "id": "b93",
+   "node_id": "jacobs_hall",
+   "fill_pct": 57.6,
+   "status": "ok"
+  },
+  {
+   "id": "b94",
+   "node_id": "jacobs_hall",
+   "fill_pct": 57.7,
+   "status": "ok"
+  },
+  {
+   "id": "b95",
+   "node_id": "warren_lecture",
+   "fill_pct": 37.6,
+   "status": "ok"
+  },
+  {
+   "id": "b96",
+   "node_id": "warren_lecture",
+   "fill_pct": 65.1,
+   "status": "ok"
+  },
+  {
+   "id": "b97",
+   "node_id": "warren_lecture",
+   "fill_pct": 54.8,
+   "status": "ok"
+  },
+  {
+   "id": "b98",
+   "node_id": "warren_lecture",
+   "fill_pct": 43.0,
+   "status": "ok"
+  },
+  {
+   "id": "b99",
+   "node_id": "warren_lecture",
+   "fill_pct": 49.0,
+   "status": "ok"
+  },
+  {
+   "id": "b100",
+   "node_id": "warren_lecture",
+   "fill_pct": 60.2,
+   "status": "ok"
+  },
+  {
+   "id": "b101",
+   "node_id": "warren_lecture",
+   "fill_pct": 70.9,
+   "status": "ok"
+  },
+  {
+   "id": "b102",
+   "node_id": "warren_lecture",
+   "fill_pct": 48.5,
+   "status": "ok"
+  },
+  {
+   "id": "b103",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 73.4,
+   "status": "ok"
+  },
+  {
+   "id": "b104",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 41.4,
+   "status": "ok"
+  },
+  {
+   "id": "b105",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 59.4,
+   "status": "ok"
+  },
+  {
+   "id": "b106",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 60.6,
+   "status": "ok"
+  },
+  {
+   "id": "b107",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 61.8,
+   "status": "ok"
+  },
+  {
+   "id": "b108",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 63.3,
+   "status": "ok"
+  },
+  {
+   "id": "b109",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 50.0,
+   "status": "ok"
+  },
+  {
+   "id": "b110",
+   "node_id": "sun_god_lawn",
+   "fill_pct": 39.0,
+   "status": "ok"
+  },
+  {
+   "id": "b111",
+   "node_id": "engineering_2",
+   "fill_pct": 43.6,
+   "status": "ok"
+  },
+  {
+   "id": "b112",
+   "node_id": "engineering_2",
+   "fill_pct": 60.1,
+   "status": "ok"
+  },
+  {
+   "id": "b113",
+   "node_id": "engineering_2",
+   "fill_pct": 52.0,
+   "status": "ok"
+  },
+  {
+   "id": "b114",
+   "node_id": "engineering_2",
+   "fill_pct": 65.8,
+   "status": "ok"
+  },
+  {
+   "id": "b115",
+   "node_id": "engineering_2",
+   "fill_pct": 65.8,
+   "status": "ok"
+  },
+  {
+   "id": "b116",
+   "node_id": "engineering_2",
+   "fill_pct": 57.0,
+   "status": "ok"
+  },
+  {
+   "id": "b117",
+   "node_id": "engineering_2",
+   "fill_pct": 51.8,
+   "status": "ok"
+  },
+  {
+   "id": "b118",
+   "node_id": "engineering_2",
+   "fill_pct": 38.5,
+   "status": "ok"
+  },
+  {
+   "id": "b119",
+   "node_id": "cognitive_science",
+   "fill_pct": 49.0,
+   "status": "ok"
+  },
+  {
+   "id": "b120",
+   "node_id": "cognitive_science",
+   "fill_pct": 43.9,
+   "status": "ok"
+  },
+  {
+   "id": "b121",
+   "node_id": "cognitive_science",
+   "fill_pct": 57.5,
+   "status": "ok"
+  },
+  {
+   "id": "b122",
+   "node_id": "cognitive_science",
+   "fill_pct": 39.5,
+   "status": "ok"
+  },
+  {
+   "id": "b123",
+   "node_id": "cognitive_science",
+   "fill_pct": 62.4,
+   "status": "ok"
+  },
+  {
+   "id": "b124",
+   "node_id": "cognitive_science",
+   "fill_pct": 54.8,
+   "status": "ok"
+  },
+  {
+   "id": "b125",
+   "node_id": "cognitive_science",
+   "fill_pct": 66.9,
+   "status": "ok"
+  },
+  {
+   "id": "b126",
+   "node_id": "cognitive_science",
+   "fill_pct": 73.4,
+   "status": "ok"
+  },
+  {
+   "id": "b127",
+   "node_id": "student_health",
+   "fill_pct": 34.0,
+   "status": "ok"
+  },
+  {
+   "id": "b128",
+   "node_id": "student_health",
+   "fill_pct": 42.6,
+   "status": "ok"
+  },
+  {
+   "id": "b129",
+   "node_id": "student_health",
+   "fill_pct": 41.5,
+   "status": "ok"
+  },
+  {
+   "id": "b130",
+   "node_id": "student_health",
+   "fill_pct": 62.9,
+   "status": "ok"
+  },
+  {
+   "id": "b131",
+   "node_id": "student_health",
+   "fill_pct": 60.3,
+   "status": "ok"
+  },
+  {
+   "id": "b132",
+   "node_id": "student_health",
+   "fill_pct": 57.4,
+   "status": "ok"
+  },
+  {
+   "id": "b133",
+   "node_id": "structural_materials",
+   "fill_pct": 51.8,
+   "status": "ok"
+  },
+  {
+   "id": "b134",
+   "node_id": "structural_materials",
+   "fill_pct": 43.3,
+   "status": "ok"
+  },
+  {
+   "id": "b135",
+   "node_id": "structural_materials",
+   "fill_pct": 45.4,
+   "status": "ok"
+  },
+  {
+   "id": "b136",
+   "node_id": "structural_materials",
+   "fill_pct": 64.2,
+   "status": "ok"
+  },
+  {
+   "id": "b137",
+   "node_id": "structural_materials",
+   "fill_pct": 41.6,
+   "status": "ok"
+  },
+  {
+   "id": "b138",
+   "node_id": "structural_materials",
+   "fill_pct": 40.1,
+   "status": "ok"
+  },
+  {
+   "id": "b139",
+   "node_id": "brennan_hall",
+   "fill_pct": 53.5,
+   "status": "ok"
+  },
+  {
+   "id": "b140",
+   "node_id": "brennan_hall",
+   "fill_pct": 67.9,
+   "status": "ok"
+  },
+  {
+   "id": "b141",
+   "node_id": "brennan_hall",
+   "fill_pct": 57.6,
+   "status": "ok"
+  },
+  {
+   "id": "b142",
+   "node_id": "brennan_hall",
+   "fill_pct": 51.8,
+   "status": "ok"
+  },
+  {
+   "id": "b143",
+   "node_id": "brennan_hall",
+   "fill_pct": 41.8,
+   "status": "ok"
+  },
+  {
+   "id": "b144",
+   "node_id": "brennan_hall",
+   "fill_pct": 48.9,
+   "status": "ok"
+  },
+  {
+   "id": "b145",
+   "node_id": "social_sciences",
+   "fill_pct": 30.9,
+   "status": "ok"
+  },
+  {
+   "id": "b146",
+   "node_id": "social_sciences",
+   "fill_pct": 63.6,
+   "status": "ok"
+  },
+  {
+   "id": "b147",
+   "node_id": "social_sciences",
+   "fill_pct": 50.4,
+   "status": "ok"
+  },
+  {
+   "id": "b148",
+   "node_id": "social_sciences",
+   "fill_pct": 63.7,
+   "status": "ok"
+  },
+  {
+   "id": "b149",
+   "node_id": "social_sciences",
+   "fill_pct": 53.7,
+   "status": "ok"
+  },
+  {
+   "id": "b150",
+   "node_id": "douglas_hall",
+   "fill_pct": 37.3,
+   "status": "ok"
+  },
+  {
+   "id": "b151",
+   "node_id": "douglas_hall",
+   "fill_pct": 43.3,
+   "status": "ok"
+  },
+  {
+   "id": "b152",
+   "node_id": "douglas_hall",
+   "fill_pct": 34.6,
+   "status": "ok"
+  },
+  {
+   "id": "b153",
+   "node_id": "douglas_hall",
+   "fill_pct": 56.0,
+   "status": "ok"
+  },
+  {
+   "id": "b154",
+   "node_id": "douglas_hall",
+   "fill_pct": 50.0,
+   "status": "ok"
+  },
+  {
+   "id": "b155",
+   "node_id": "brown_hall",
+   "fill_pct": 33.9,
+   "status": "ok"
+  },
+  {
+   "id": "b156",
+   "node_id": "brown_hall",
+   "fill_pct": 53.8,
+   "status": "ok"
+  },
+  {
+   "id": "b157",
+   "node_id": "brown_hall",
+   "fill_pct": 54.3,
+   "status": "ok"
+  },
+  {
+   "id": "b158",
+   "node_id": "brown_hall",
+   "fill_pct": 35.3,
+   "status": "ok"
+  },
+  {
+   "id": "b159",
+   "node_id": "brown_hall",
+   "fill_pct": 43.8,
+   "status": "ok"
+  },
+  {
+   "id": "b160",
+   "node_id": "black_hall",
+   "fill_pct": 46.9,
+   "status": "ok"
+  },
+  {
+   "id": "b161",
+   "node_id": "black_hall",
+   "fill_pct": 46.9,
+   "status": "ok"
+  },
+  {
+   "id": "b162",
+   "node_id": "black_hall",
+   "fill_pct": 29.2,
+   "status": "ok"
+  },
+  {
+   "id": "b163",
+   "node_id": "black_hall",
+   "fill_pct": 51.9,
+   "status": "ok"
+  },
+  {
+   "id": "b164",
+   "node_id": "black_hall",
+   "fill_pct": 47.0,
+   "status": "ok"
+  },
+  {
+   "id": "b165",
+   "node_id": "atkinson_hall",
+   "fill_pct": 55.9,
+   "status": "ok"
+  },
+  {
+   "id": "b166",
+   "node_id": "atkinson_hall",
+   "fill_pct": 42.4,
+   "status": "ok"
+  },
+  {
+   "id": "b167",
+   "node_id": "atkinson_hall",
+   "fill_pct": 53.8,
+   "status": "ok"
+  },
+  {
+   "id": "b168",
+   "node_id": "atkinson_hall",
+   "fill_pct": 39.1,
+   "status": "ok"
+  },
+  {
+   "id": "b169",
+   "node_id": "serf",
+   "fill_pct": 36.6,
+   "status": "ok"
+  },
+  {
+   "id": "b170",
+   "node_id": "serf",
+   "fill_pct": 42.9,
+   "status": "ok"
+  },
+  {
+   "id": "b171",
+   "node_id": "serf",
+   "fill_pct": 39.6,
+   "status": "ok"
+  },
+  {
+   "id": "b172",
+   "node_id": "serf",
+   "fill_pct": 47.1,
+   "status": "ok"
+  },
+  {
+   "id": "b173",
+   "node_id": "conrad_prebys",
+   "fill_pct": 29.2,
+   "status": "ok"
+  },
+  {
+   "id": "b174",
+   "node_id": "conrad_prebys",
+   "fill_pct": 44.6,
+   "status": "ok"
+  },
+  {
+   "id": "b175",
+   "node_id": "conrad_prebys",
+   "fill_pct": 25.2,
+   "status": "ok"
+  },
+  {
+   "id": "b176",
+   "node_id": "conrad_prebys",
+   "fill_pct": 42.3,
+   "status": "ok"
+  },
+  {
+   "id": "b177",
+   "node_id": "franklin_antonio",
+   "fill_pct": 37.6,
+   "status": "ok"
+  },
+  {
+   "id": "b178",
+   "node_id": "franklin_antonio",
+   "fill_pct": 26.7,
+   "status": "ok"
+  },
+  {
+   "id": "b179",
+   "node_id": "franklin_antonio",
+   "fill_pct": 19.5,
+   "status": "ok"
+  },
+  {
+   "id": "b180",
+   "node_id": "franklin_antonio",
+   "fill_pct": 24.9,
+   "status": "ok"
+  },
+  {
+   "id": "b181",
+   "node_id": "canyonview",
+   "fill_pct": 28.8,
+   "status": "ok"
+  },
+  {
+   "id": "b182",
+   "node_id": "canyonview",
+   "fill_pct": 38.1,
+   "status": "ok"
+  },
+  {
+   "id": "b183",
+   "node_id": "canyonview",
+   "fill_pct": 57.9,
+   "status": "ok"
+  },
+  {
+   "id": "b184",
+   "node_id": "canyonview",
+   "fill_pct": 38.2,
+   "status": "ok"
+  },
+  {
+   "id": "b185",
+   "node_id": "career_services",
+   "fill_pct": 42.8,
+   "status": "ok"
+  },
+  {
+   "id": "b186",
+   "node_id": "career_services",
+   "fill_pct": 33.8,
+   "status": "ok"
+  },
+  {
+   "id": "b187",
+   "node_id": "career_services",
+   "fill_pct": 39.8,
+   "status": "ok"
+  },
+  {
+   "id": "b188",
+   "node_id": "coalition",
+   "fill_pct": 50.8,
+   "status": "ok"
+  },
+  {
+   "id": "b189",
+   "node_id": "coalition",
+   "fill_pct": 53.2,
+   "status": "ok"
+  },
+  {
+   "id": "b190",
+   "node_id": "coalition",
+   "fill_pct": 45.9,
+   "status": "ok"
+  },
+  {
+   "id": "b191",
+   "node_id": "umoja",
+   "fill_pct": 60.4,
+   "status": "ok"
+  },
+  {
+   "id": "b192",
+   "node_id": "umoja",
+   "fill_pct": 55.3,
+   "status": "ok"
+  },
+  {
+   "id": "b193",
+   "node_id": "umoja",
+   "fill_pct": 52.6,
+   "status": "ok"
+  },
+  {
+   "id": "b194",
+   "node_id": "alianza",
+   "fill_pct": 36.1,
+   "status": "ok"
+  },
+  {
+   "id": "b195",
+   "node_id": "alianza",
+   "fill_pct": 27.7,
+   "status": "ok"
+  },
+  {
+   "id": "b196",
+   "node_id": "alianza",
+   "fill_pct": 31.1,
+   "status": "ok"
+  },
+  {
+   "id": "b197",
+   "node_id": "faculty_club",
+   "fill_pct": 21.9,
+   "status": "ok"
+  },
+  {
+   "id": "b198",
+   "node_id": "faculty_club",
+   "fill_pct": 22.4,
+   "status": "ok"
+  }
+ ],
+ "docks": [
+  {
+   "id": "d1",
+   "node_id": "geisel",
+   "slots": 2
+  },
+  {
+   "id": "d2",
+   "node_id": "warren_mall",
+   "slots": 2
+  }
+ ],
+ "robots": [
+  {
+   "id": "r1",
+   "lat": 32.8802,
+   "lng": -117.2374,
+   "node_id": "library_walk",
+   "state": "EN_ROUTE",
+   "battery_pct": 64,
+   "load_pct": 30,
+   "route": [
+    "b1",
+    "b2",
+    "b3"
+   ]
+  },
+  {
+   "id": "r2",
+   "lat": 32.8815,
+   "lng": -117.235,
+   "node_id": "jacobs_hall",
+   "state": "STUCK",
+   "battery_pct": 41,
+   "load_pct": 55,
+   "route": [
+    "b4"
+   ]
+  },
+  {
+   "id": "r3",
+   "lat": 32.8811,
+   "lng": -117.2375,
+   "node_id": "geisel",
+   "state": "CHARGING",
+   "battery_pct": 22,
+   "load_pct": 0,
+   "route": []
+  },
+  {
+   "id": "r4",
+   "lat": 32.8811,
+   "lng": -117.2348,
+   "node_id": "warren_mall",
+   "state": "IDLE",
+   "battery_pct": 88,
+   "load_pct": 10,
+   "route": []
+  }
+ ],
+ "events": [
+  {
+   "id": 98,
+   "sim_time": "2026-10-24T12:02:00",
+   "kind": "dispatch",
+   "message": "Robot r1 assigned to bin b4 at Library Walk"
+  },
+  {
+   "id": 99,
+   "sim_time": "2026-10-24T12:08:00",
+   "kind": "fault",
+   "message": "Library Walk is blocked by a crowd"
+  },
+  {
+   "id": 100,
+   "sim_time": "2026-10-24T12:09:00",
+   "kind": "reroute",
+   "message": "Robot r1 rerouted: Library Walk blocked"
+  },
+  {
+   "id": 101,
+   "sim_time": "2026-10-24T12:14:00",
+   "kind": "escalate",
+   "message": "Robot r2 is stuck near Jacobs Hall. Task reassigned and a human was texted."
+  }
+ ],
+ "kpis": {
+  "robots_active": 4,
+  "overflow_minutes": 48,
+  "avg_wait_min": 11.0,
+  "distance_per_pickup_m": 410
+ },
+ "fleet_sizing": [
+  {
+   "robots": 2,
+   "avg_wait_min": 48.0,
+   "max_wait_min": 140.0,
+   "overflow_minutes": 410
+  },
+  {
+   "robots": 3,
+   "avg_wait_min": 31.0,
+   "max_wait_min": 85.0,
+   "overflow_minutes": 240
+  },
+  {
+   "robots": 4,
+   "avg_wait_min": 19.0,
+   "max_wait_min": 52.0,
+   "overflow_minutes": 130
+  },
+  {
+   "robots": 5,
+   "avg_wait_min": 11.0,
+   "max_wait_min": 29.0,
+   "overflow_minutes": 48
+  },
+  {
+   "robots": 6,
+   "avg_wait_min": 7.0,
+   "max_wait_min": 14.0,
+   "overflow_minutes": 0
+  },
+  {
+   "robots": 7,
+   "avg_wait_min": 5.0,
+   "max_wait_min": 11.0,
+   "overflow_minutes": 0
+  },
+  {
+   "robots": 8,
+   "avg_wait_min": 4.0,
+   "max_wait_min": 9.0,
+   "overflow_minutes": 0
+  }
+ ]
+}

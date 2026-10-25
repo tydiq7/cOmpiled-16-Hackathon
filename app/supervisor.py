@@ -11,6 +11,7 @@ LOOP_MAX_DISTINCT = 3    # ...if they cover this few nodes or fewer, the robot i
 BATTERY_RESERVE_PCT = 5.0
 MAX_TASK_ATTEMPTS = 3
 ENERGY_BUDGET_PCT_PER_ROBOT = 400.0   # total battery % the fleet may burn per robot before dispatch pauses
+OVERFLOW_ALERT_COOLDOWN_MIN = 15   # at most one overflow-risk alert per site per window; bins at risk are summarized
 WATCHED = ("EN_ROUTE", "COLLECTING", "RETURNING", "UNLOADING")
 
 
@@ -19,8 +20,10 @@ def step(w):
         if r["state"] == "ESCALATED":
             continue
         _check_battery(w, r)
-        _check_looping(w, r)
-        _check_stuck(w, r)
+        if r["online"]:  # the server cannot observe an offline robot's progress; the lease check covers it
+            _check_looping(w, r)
+            _check_stuck(w, r)
+    _check_leases(w)
     _check_budget(w)
     _check_overflow_risk(w)
 
@@ -60,6 +63,23 @@ def _escalate(w, r, reason):
     if bins:
         msg += f"; task for bin {', '.join(bins)} reassigned"
     notify.alert(w, msg + ". Needs a human.", robot_id=r["id"], bin_id=bins[0] if bins else None)
+
+
+# ---- connection loss -------------------------------------------------------------------------
+def _check_leases(w):
+    """Reassign an offline robot's bins only after its lease (plus a short grace) has run out. By then the
+    robot's own offline instructions have made it stand down, so two robots never go for the same bin."""
+    for r in w.robots:
+        if r["online"] or r["lease_handled"] or w.t < r["lease_until"] + w.SERVER_GRACE_MIN:
+            continue
+        r["lease_handled"] = True
+        mine = [t for t in w.tasks if t["robot_id"] == r["id"] and t["status"] == "assigned"]
+        for t in mine:
+            t["status"], t["robot_id"] = "open", None
+            w._refresh_bin_status(w.bin_by_id[t["bin_id"]])
+        text = f"Robot {r['id']} has been out of contact for {w.t - r['offline_since']} min"
+        text += f"; its {len(mine)} unfinished bins were reassigned." if mine else "."
+        notify.alert(w, text + " Needs a human.", robot_id=r["id"])
 
 
 # ---- looping ---------------------------------------------------------------------------------
@@ -111,31 +131,43 @@ def _check_budget(w):
 
 
 def _check_overflow_risk(w):
-    """Alert (once per bin) when a bin will overflow before any robot could get there."""
+    """Alert when bins will overflow before any robot could get there. Alerts are batched: one
+    summary per cooldown window, so a big site doesn't flood a human's phone."""
     alerted = w.__dict__.setdefault("overflow_alerted", set())
     for b in w.bins:
-        if b["id"] in alerted:
-            if b["fill_pct"] < 50:
-                alerted.discard(b["id"])  # emptied: re-arm
+        if b["id"] in alerted and b["fill_pct"] < 50:
+            alerted.discard(b["id"])  # emptied: re-arm
+    last = w.__dict__.get("overflow_alert_t", -10**9)
+    if w.t - last < OVERFLOW_ALERT_COOLDOWN_MIN:
+        return
+    assigned = {t["bin_id"] for t in w.tasks if t["status"] == "assigned"}
+    mult = w.current_fill_multiplier()
+    at_risk = []  # (minutes_left, bin, eta)
+    for b in w.bins:
+        if b["id"] in alerted or b["fill_pct"] < 80 or b["id"] in assigned:
             continue
-        if b["fill_pct"] < 80:
-            continue
-        if any(t["bin_id"] == b["id"] and t["status"] == "assigned" for t in w.tasks):
-            continue  # a robot is already on its way
-        rate_per_min = max(b["rate"] * w.current_fill_multiplier() / 60.0, 0.01)
-        minutes_left = max(0.0, (100.0 - b["fill_pct"]) / rate_per_min)
+        minutes_left = max(0.0, (100.0 - b["fill_pct"]) / max(b["rate"] * mult / 60.0, 0.01))
         eta = _best_eta_min(w, b)
         if eta is None or eta > minutes_left:
-            alerted.add(b["id"])
-            when = "is overflowing" if b["fill_pct"] >= 100 else f"will overflow in ~{minutes_left:.0f} min"
-            who = "no robot can reach it" if eta is None else f"the nearest robot is ~{eta:.0f} min away"
-            notify.alert(w, f"Bin {b['id']} at {w.node_name(b['node_id'])} {when} and {who}.", bin_id=b["id"])
+            at_risk.append((minutes_left, b, eta))
+    if not at_risk:
+        return
+    at_risk.sort(key=lambda x: x[0])
+    minutes_left, worst, eta = at_risk[0]
+    alerted.update(b["id"] for _, b, _ in at_risk)
+    w.overflow_alert_t = w.t
+    when = "is overflowing" if worst["fill_pct"] >= 100 else f"will overflow in ~{minutes_left:.0f} min"
+    who = "no robot can reach it" if eta is None else f"the nearest robot is ~{eta:.0f} min away"
+    msg = f"Bin {worst['id']} at {w.node_name(worst['node_id'])} {when} and {who}."
+    if len(at_risk) > 1:
+        msg = f"{len(at_risk)} bins at risk of overflowing. Worst: " + msg[0].lower() + msg[1:]
+    notify.alert(w, msg, bin_id=worst["id"])
 
 
 def _best_eta_min(w, b):
     best = None
     for r in w.robots:
-        if r["frozen"] or r["state"] in ("ESCALATED", "STUCK") or r["battery"] <= 0:
+        if r["frozen"] or r["state"] in ("ESCALATED", "STUCK") or r["battery"] <= 0 or not r["online"]:
             continue
         p = nav.shortest_path(w.graph, r["node"], b["node_id"])
         if p is None:

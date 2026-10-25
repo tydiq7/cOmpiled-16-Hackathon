@@ -5,10 +5,11 @@ World is the in-memory source of truth. In live mode it mirrors itself into SQLi
 skips the database entirely and runs as fast as Python allows.
 """
 import json
+import math
 import random
 from datetime import datetime, timedelta
 
-from . import db, dispatcher, navigation as nav, seed_ucsd, supervisor
+from . import db, dispatcher, navigation as nav, sites, supervisor
 
 DAY_START = datetime(2026, 10, 24, 8, 0)
 DAY_END_MIN = 12 * 60  # 8 AM -> 8 PM
@@ -38,11 +39,17 @@ class World:
     LOW_BATTERY_PCT = 25.0
     COLLECT_MIN = 2
     UNLOAD_MIN = 3
+    LEASE_MIN = 25               # a robot's assignment stays valid this long after its last contact with the server
+    SERVER_GRACE_MIN = COLLECT_MIN + 1   # the server waits this much longer before reassigning, so a pickup in progress finishes
+    ROBOT_SIDE_KINDS = ("collected", "unload", "reroute", "no_route", "offline_abort")  # logged on the robot while offline
 
-    def __init__(self, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
+    def __init__(self, site=None, num_robots=None, seed=42, live=False, use_optimizer=True, plan_time_limit_s=None):
+        self.site = site or sites.get(sites.DEFAULT_SITE_ID)
+        self.site_id = self.site.id
+        self._curve = self.site.fill_multiplier or fill_multiplier  # each venue has its own busy hours
         self.live = live
         self.use_optimizer = use_optimizer
-        self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (1.0 if live else 0.2)
+        self.plan_time_limit_s = plan_time_limit_s if plan_time_limit_s is not None else (0.15 if live else 0.05)
         self.rng = random.Random(seed)
         self.t = 0                    # sim minutes since DAY_START
         self.running = False
@@ -50,25 +57,25 @@ class World:
         self.events = []              # in-memory log (headless) -- live mode writes to SQLite
         self._event_id = 0
 
-        s = seed_ucsd
-        self.nodes = {n["id"]: dict(n) for n in s.NODES}
+        site = self.site
+        self.nodes = {n["id"]: dict(n) for n in site.nodes}
         self.edges = []
-        for e in s.EDGES:
+        for e in site.edges:
             a, b = self.nodes[e["from"]], self.nodes[e["to"]]
-            length = e.get("length_m") or round(db._haversine_m(a, b), 1)
-            self.edges.append({"id": e["id"], "from": e["from"], "to": e["to"], "length_m": length,
+            self.edges.append({"id": e["id"], "from": e["from"], "to": e["to"], "length_m": e["length_m"],
                                "blocked": False, "blocked_until": None,
                                "name": e.get("name") or f"{a['name']}-{b['name']}"})
         self.edge_by_id = {e["id"]: e for e in self.edges}
         self.graph = nav.build_graph(self.nodes.values(), self.edges)
 
         self.bins = [{"id": b["id"], "node_id": b["node_id"], "capacity_l": b["capacity_l"],
-                      "rate": b["fill_rate_pct_per_hr"], "fill_pct": self.rng.uniform(5, 40),
-                      "status": "ok", "last_emptied": None} for b in s.BINS]
+                      "rate": b["fill_rate_pct_per_hr"],
+                      "fill_pct": b["start_fill_pct"] if b.get("start_fill_pct") is not None else self.rng.uniform(5, 40),
+                      "status": "ok", "last_emptied": None} for b in site.bins]
         self.bin_by_id = {b["id"]: b for b in self.bins}
-        self.docks = [dict(d) for d in s.DOCKS]
+        self.docks = [dict(d) for d in site.docks]
 
-        robot_seed = list(s.ROBOTS)
+        robot_seed = list(site.robots)
         if num_robots is not None:  # headless sweeps: n robots spread over the docks
             robot_seed = [{"id": f"r{i + 1}", "node_id": self.docks[i % len(self.docks)]["node_id"]}
                           for i in range(num_robots)]
@@ -84,6 +91,8 @@ class World:
         self.pickups = 0
         self.energy_pct = 0.0         # total battery % consumed by the fleet
         self.dispatch_paused = False  # set by the over-budget detector
+        self.offline_aborts = 0       # times a robot stood down on its own after losing contact
+        self.conflicts = 0            # pickups made by a robot that did not hold that bin's assignment (should stay 0)
 
     # ---- construction helpers -------------------------------------------------------------
     def _new_robot(self, r):
@@ -92,7 +101,9 @@ class World:
                 "lat": n["lat"], "lng": n["lng"], "route": [], "path": [], "seg": None,
                 "task_id": None, "timer": 0, "frozen": False, "waiting": False,
                 "drain_mult": 1.0, "drain_until": None, "last_progress": 0, "target": None,
-                "visits": [], "prev_state": None, "stuck_since": None}
+                "visits": [], "prev_state": None, "stuck_since": None,
+                "online": True, "offline_until": None, "offline_since": None, "lease_until": 0, "lease_handled": False,
+                "offline_log": [], "seen": None}
 
     def new_task(self, b):
         self._task_id += 1
@@ -123,17 +134,24 @@ class World:
         """(dock_node_id, distance_m) of the closest reachable dock, or None."""
         best = None
         for d in self.docks:
-            p = nav.shortest_path(self.graph, node_id, d["node_id"])
-            if p and (best is None or p[1] < best[1]):
-                best = (d["node_id"], p[1])
+            dist = nav.distance(self.graph, node_id, d["node_id"])
+            if dist is not None and (best is None or dist < best[1]):
+                best = (d["node_id"], dist)
         return best
 
     def log(self, kind, message, robot_id=None, bin_id=None):
+        r = self.robot_by_id.get(robot_id) if robot_id else None
+        if r is not None and not r["online"] and kind in self.ROBOT_SIDE_KINDS:
+            r["offline_log"].append((self.sim_time(), kind, message, bin_id))  # the server only hears this on reconnect
+            return
+        self._emit(self.sim_time(), kind, message, robot_id, bin_id)
+
+    def _emit(self, sim_time, kind, message, robot_id=None, bin_id=None):
         if self.live:
-            db.add_event(self.sim_time(), kind, message, robot_id=robot_id, bin_id=bin_id)
+            db.add_event(self.site_id, sim_time, kind, message, robot_id=robot_id, bin_id=bin_id)
         else:
             self._event_id += 1
-            self.events.append({"id": self._event_id, "sim_time": self.sim_time(), "kind": kind,
+            self.events.append({"id": self._event_id, "sim_time": sim_time, "kind": kind,
                                 "message": message, "robot_id": robot_id, "bin_id": bin_id})
 
     # ---- dispatcher hooks -----------------------------------------------------------------
@@ -187,7 +205,7 @@ class World:
         return True
 
     def current_fill_multiplier(self):
-        return fill_multiplier((DAY_START + timedelta(minutes=self.t)).hour)
+        return self._curve((DAY_START + timedelta(minutes=self.t)).hour)
 
     def _replan(self, r, blocked_name=None):
         """Recompute the path from where the robot will next be at a node."""
@@ -267,6 +285,9 @@ class World:
         r["battery"] = max(0.0, r["battery"] - idle)
         if r["frozen"]:
             return
+        if (not r["online"] and r["route"] and self.t >= r["lease_until"]
+                and r["state"] in ("EN_ROUTE", "IDLE")):
+            self._offline_abort(r)  # offline instructions: assignment lease ran out, stand down
         st = r["state"]
         if st == "IDLE":
             if r["route"]:
@@ -312,20 +333,82 @@ class World:
         task = next((t for t in self.tasks if t["bin_id"] == b["id"] and t["status"] == "assigned"), None)
         if task:
             task["status"], task["completed"] = "done", self.t
-            self.waits.append(self.t - task["created"])
+            if not task.get("ride_along"):
+                self.waits.append(self.t - task["created"])
             self.pickups += 1
+        if task is None or task["robot_id"] != r["id"]:
+            self.conflicts += 1
         was = b["fill_pct"]
         b["fill_pct"], b["last_emptied"] = 0.0, self.t
         self._refresh_bin_status(b)
         self.log("collected", f"Robot {r['id']} emptied bin {b['id']} at {self.node_name(b['node_id'])} "
                               f"({was:.0f}% full)", robot_id=r["id"], bin_id=b["id"])
         r["task_id"] = None
+        if r["route"] and not r["online"] and self.t >= r["lease_until"]:
+            self._offline_abort(r)  # lease over while collecting: do not start another stop
+            return
         if r["route"]:
             if self._begin_path(r, self.bin_by_id[r["route"][0]]["node_id"]):
                 r["state"] = "EN_ROUTE"
                 return
         dock = self.nearest_dock(r["node"])
         if dock and self._begin_path(r, dock[0]):
+            r["state"] = "RETURNING"
+        else:
+            r["state"] = "IDLE"
+
+    # ---- connection loss ------------------------------------------------------------------
+    def _view(self, r):
+        """What the server last heard from this robot (frozen at the moment contact is lost)."""
+        v = {k: r[k] for k in ("node", "state", "battery", "load", "lat", "lng", "last_progress", "task_id")}
+        v["route"] = list(r["route"])
+        return v
+
+    def drop_signal(self, robot_id, minutes=15):
+        """Fault: the robot loses its connection for `minutes` sim-minutes. It keeps running its offline
+        instructions: finish the assigned stops, but never past its lease, then go to a dock and wait."""
+        r = self.robot_by_id[robot_id]
+        if not r["online"]:
+            return
+        r["seen"] = self._view(r)
+        r["online"], r["offline_since"], r["offline_until"] = False, self.t, self.t + minutes
+        until = self.sim_time(r["lease_until"])[11:16]
+        self.log("signal_lost", f"Lost contact with robot {robot_id} near {self.node_name(r['node'])}. It keeps "
+                                f"working from its offline instructions until {until}, then returns to dock",
+                 robot_id=robot_id)
+
+    def restore_signal(self, robot_id):
+        """The robot reconnects: replay what it did offline, then catch it up to the server's current plan."""
+        r = self.robot_by_id[robot_id]
+        if r["online"]:
+            return
+        r["online"], r["offline_until"], r["lease_handled"], r["seen"] = True, None, False, None
+        r["lease_until"] = self.t + self.LEASE_MIN
+        buffered, r["offline_log"] = r["offline_log"], []
+        for ts, kind, msg, bid in buffered:
+            self._emit(ts, kind, msg + " (synced after reconnect)", robot_id, bid)
+        keep = [bid for bid in r["route"] if any(t["bin_id"] == bid and t["robot_id"] == robot_id
+                                                 and t["status"] == "assigned" for t in self.tasks)]
+        dropped = [bid for bid in r["route"] if bid not in keep]
+        if dropped:  # reassigned while it was away: stand down
+            r["route"] = keep
+            if r["state"] == "EN_ROUTE":
+                if not (keep and self._begin_path(r, self.bin_by_id[keep[0]]["node_id"])):
+                    dock = self.nearest_dock(r["node"])
+                    r["state"] = "RETURNING" if dock and self.begin_path_from(r, dock[0]) else "IDLE"
+        msg = f"Robot {robot_id} back online after {self.t - r['offline_since']} min: synced {len(buffered)} offline actions"
+        if dropped:
+            msg += f"; dropped stops {', '.join(dropped)} (reassigned meanwhile)"
+        self._emit(self.sim_time(), "signal_restored", msg, robot_id)
+
+    def _offline_abort(self, r):
+        """Offline instructions: the assignment lease ran out, so drop the remaining stops and return to dock."""
+        dropped, r["route"], r["task_id"] = list(r["route"]), [], None
+        self.offline_aborts += 1
+        self.log("offline_abort", f"Robot {r['id']} lost contact and its lease ran out: dropped stops "
+                                  f"{', '.join(dropped)} and is returning to dock", robot_id=r["id"])
+        dock = self.nearest_dock(r["node"])
+        if dock and self.begin_path_from(r, dock[0]):
             r["state"] = "RETURNING"
         else:
             r["state"] = "IDLE"
@@ -344,7 +427,7 @@ class World:
     def tick(self):
         self.t += 1
         hour = (DAY_START + timedelta(minutes=self.t)).hour
-        mult = fill_multiplier(hour)
+        mult = self._curve(hour)
         for e in self.edges:  # crowds disperse
             if e["blocked"] and e["blocked_until"] is not None and self.t >= e["blocked_until"]:
                 self.set_edge_blocked(e["id"], False)
@@ -353,6 +436,11 @@ class World:
             if b["fill_pct"] >= 100:
                 self.overflow_minutes += 1
             self._refresh_bin_status(b)
+        for r in self.robots:
+            if not r["online"] and r["offline_until"] is not None and self.t >= r["offline_until"]:
+                self.restore_signal(r["id"])
+            elif r["online"]:
+                r["lease_until"] = self.t + self.LEASE_MIN  # heartbeat: the server renews the assignment lease
         dispatcher.step(self)
         for r in self.robots:
             self._step_robot(r)
@@ -398,40 +486,45 @@ class World:
 
     def final_waits(self):
         """Waits of finished pickups plus the running wait of tasks still open (so a tiny fleet can't hide)."""
-        pending = [self.t - t["created"] for t in self.tasks if t["status"] in ("open", "assigned", "escalated")]
+        pending = [self.t - t["created"] for t in self.tasks
+                   if t["status"] in ("open", "assigned", "escalated") and not t.get("ride_along")]
         return self.waits + pending
 
     # ---- persistence ----------------------------------------------------------------------
     def persist(self):
+        sid = self.site_id
         with db.lock:
             c = db.conn()
-            c.executemany("UPDATE bins SET fill_pct=?, status=?, last_emptied_at=? WHERE id=?",
-                          [(b["fill_pct"], b["status"], b["last_emptied"] and self.sim_time(b["last_emptied"]), b["id"])
+            c.executemany("UPDATE bins SET fill_pct=?, status=?, last_emptied_at=? WHERE site_id=? AND id=?",
+                          [(b["fill_pct"], b["status"], b["last_emptied"] and self.sim_time(b["last_emptied"]), sid, b["id"])
                            for b in self.bins])
             c.executemany(
                 "UPDATE robots SET current_node_id=?, state=?, battery_pct=?, load_pct=?, task_id=?,"
-                " last_progress_at=?, lat=?, lng=?, route_json=? WHERE id=?",
-                [(r["node"], r["state"], r["battery"], r["load"], r["task_id"], self.sim_time(r["last_progress"]),
-                  r["lat"], r["lng"], json.dumps(r["route"]), r["id"]) for r in self.robots])
-            c.executemany("UPDATE edges SET blocked=?, blocked_until=? WHERE id=?",
-                          [(int(e["blocked"]), e["blocked_until"] and self.sim_time(e["blocked_until"]), e["id"])
+                " last_progress_at=?, lat=?, lng=?, route_json=?, online=? WHERE site_id=? AND id=?",
+                [(v["node"], v["state"], v["battery"], v["load"], v["task_id"], self.sim_time(v["last_progress"]),
+                  v["lat"], v["lng"], json.dumps(v["route"]), int(r["online"]), sid, r["id"])
+                 for r in self.robots for v in [r if r["online"] else r["seen"]]])
+            c.executemany("UPDATE edges SET blocked=?, blocked_until=? WHERE site_id=? AND id=?",
+                          [(int(e["blocked"]), e["blocked_until"] and self.sim_time(e["blocked_until"]), sid, e["id"])
                            for e in self.edges])
             c.executemany(
-                "INSERT OR REPLACE INTO tasks (id, bin_id, robot_id, created_at, assigned_at, completed_at, status, attempts)"
-                " VALUES (?,?,?,?,?,?,?,?)",
-                [(t["id"], t["bin_id"], t["robot_id"], self.sim_time(t["created"]),
+                "INSERT OR REPLACE INTO tasks (site_id, id, bin_id, robot_id, created_at, assigned_at, completed_at, status, attempts)"
+                " VALUES (?,?,?,?,?,?,?,?,?)",
+                [(sid, t["id"], t["bin_id"], t["robot_id"], self.sim_time(t["created"]),
                   t["assigned"] is not None and self.sim_time(t["assigned"]) or None,
                   t["completed"] is not None and self.sim_time(t["completed"]) or None,
                   t["status"], t["attempts"]) for t in self.tasks])
-            c.execute("INSERT OR REPLACE INTO meta VALUES ('kpis', ?)", (json.dumps(self.kpis()),))
+            c.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)", (f"{sid}:kpis", json.dumps(self.kpis())))
             c.commit()
 
 
-def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True):
+def run_headless(num_robots, seed=42, minutes=DAY_END_MIN, use_optimizer=True, site=None):
     """One full sim day with no database or dashboard. This is the `run_fn` for optimize.fleet_size_sweep."""
-    w = World(num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
+    w = World(site=site, num_robots=num_robots, seed=seed, live=False, use_optimizer=use_optimizer)
     for _ in range(minutes):
         w.tick()
-    waits = w.final_waits() or [0]
-    return {"avg_wait_min": round(sum(waits) / len(waits), 1), "max_wait_min": float(max(waits)),
+    waits = sorted(w.final_waits() or [0])
+    p95 = waits[max(0, math.ceil(0.95 * len(waits)) - 1)]  # 95% of bins were emptied within this many minutes
+    return {"avg_wait_min": round(sum(waits) / len(waits), 1), "max_wait_min": float(waits[-1]),
+            "p95_wait_min": float(p95),
             "overflow_minutes": float(w.overflow_minutes), "distance_m": round(w.dist_driven_m)}
