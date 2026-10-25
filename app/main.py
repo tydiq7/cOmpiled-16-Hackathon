@@ -6,9 +6,11 @@ is an alias for the default site (the original dashboard keeps working unchanged
 import asyncio
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from concurrent.futures import ProcessPoolExecutor
@@ -286,3 +288,9 @@ def supervisor_resume(site_id: str = DEFAULT):
     for t in w.tasks:
         t["attempts"] = min(t["attempts"], 1)
     return {"dispatch_paused": False}
+
+
+# The dashboard: http://localhost:8000/ serves web/index.html. Mounted last so every API route above wins.
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+if WEB_DIR.is_dir():
+    app.mount("/", StaticFiles(directory=WEB_DIR, html=True), name="web")
